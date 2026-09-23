@@ -1,17 +1,19 @@
-// @ts-nocheck — pending incremental typing (see docs/source-restore.md)
-
 /*
  * Restored from the bundled diorama (see reference/README.md).
  *
  * Mechanically converted back to source: the original module had the same
  * structure, this file just swaps the `window.__M` namespace wiring for ES
  * module imports/exports. The rendering logic itself is unchanged.
+ *
+ * TYPED ✓ — see docs/source-restore.md.
  */
 
 import * as THREE from 'three'
 
 import { COLORS, STREET, WALK, NEIGHBOUR_E, NEIGHBOUR_W, ALLEY_E, makeRng, clamp, lerp } from './config'
-import { toon, glow, additive, glowTexture } from './toon'
+import { toon, glow, additive, glowTexture, Builder } from './toon'
+import type { Vec3 } from './toon'
+import type { WetGround } from './ground'
 
 // ---------------------------------------------------------------------------
 // Everything around the store: vending machines, bicycles, poles and wires,
@@ -19,12 +21,14 @@ import { toon, glow, additive, glowTexture } from './toon'
 // neighbouring buildings that frame the corner.
 // ---------------------------------------------------------------------------
 
-function cvs(w, h) {
+/** a fresh canvas plus its 2d context */
+function cvs(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
-  return [c, c.getContext('2d')];
+  return [c, c.getContext('2d')!];
 }
-function tex(c) {
+/** canvas -> sRGB texture with anisotropy (all our props textures are painted) */
+function tex(c: HTMLCanvasElement): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
@@ -33,7 +37,10 @@ function tex(c) {
 const JP = '"Yu Gothic","YuGothic","MS Gothic","Meiryo",sans-serif';
 const EN = '"Segoe UI",Arial,sans-serif';
 
-function roundRect(g, x, y, w, h, r) {
+function roundRect(
+  g: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number, r: number,
+): void {
   g.beginPath();
   g.moveTo(x + r, y);
   g.arcTo(x + w, y, x + w, y + h, r);
@@ -44,7 +51,7 @@ function roundRect(g, x, y, w, h, r) {
 }
 
 // --- vending machine front ---------------------------------------------------
-function vendingTexture(accent = '#d93b3b') {
+function vendingTexture(accent = '#d93b3b'): THREE.CanvasTexture {
   const W = 256, Hh = 512;
   const [c, g] = cvs(W, Hh);
   g.fillStyle = '#eef1f6'; g.fillRect(0, 0, W, Hh);
@@ -79,7 +86,22 @@ function vendingTexture(accent = '#d93b3b') {
 }
 
 // --- building facade ---------------------------------------------------------
-function facadeTexture({ w = 512, h = 1024, floors = 3, base = '#3a3f4c', win = '#2a2f3c', lit = 0.45, seed = 5, shopfront = false }) {
+/** options for the painted building facades */
+export interface FacadeOpts {
+  w?: number
+  h?: number
+  floors?: number
+  base?: string
+  win?: string
+  /** 0–1, share of windows that are lit */
+  lit?: number
+  seed?: number
+  shopfront?: boolean
+}
+
+function facadeTexture(
+  { w = 512, h = 1024, floors = 3, base = '#3a3f4c', win = '#2a2f3c', lit = 0.45, seed = 5, shopfront = false }: FacadeOpts = {},
+): THREE.CanvasTexture {
   const [c, g] = cvs(w, h);
   const rng = makeRng(seed);
   g.fillStyle = base; g.fillRect(0, 0, w, h);
@@ -155,7 +177,7 @@ function facadeTexture({ w = 512, h = 1024, floors = 3, base = '#3a3f4c', win = 
 }
 
 // --- signs -------------------------------------------------------------------
-function roadSignTexture(text, sub, bg = '#2f6fe0') {
+function roadSignTexture(text: string, sub: string, bg = '#2f6fe0'): THREE.CanvasTexture {
   const W = 512, Hh = 192;
   const [c, g] = cvs(W, Hh);
   g.fillStyle = bg; g.fillRect(0, 0, W, Hh);
@@ -169,7 +191,7 @@ function roadSignTexture(text, sub, bg = '#2f6fe0') {
   return tex(c);
 }
 
-function boardTexture() {
+function boardTexture(): THREE.CanvasTexture {
   const W = 512, Hh = 384;
   const [c, g] = cvs(W, Hh);
   g.fillStyle = '#c9c4b4'; g.fillRect(0, 0, W, Hh);
@@ -188,7 +210,7 @@ function boardTexture() {
   return tex(c);
 }
 
-function shutterTexture() {
+function shutterTexture(): THREE.CanvasTexture {
   const W = 256, Hh = 256;
   const [c, g] = cvs(W, Hh);
   g.fillStyle = '#4a4f5a'; g.fillRect(0, 0, W, Hh);
@@ -202,11 +224,33 @@ function shutterTexture() {
 }
 
 // ---------------------------------------------------------------------------
-function buildProps(builder, scene, ctx = {}) {
+/** what the props module needs from its caller */
+export interface PropsCtx {
+  ground?: WetGround
+}
+
+/** animated state the props module keeps alive between frames */
+interface PropDynamics {
+  /** traffic signals; the lit lamp cycles with time */
+  signals: { lamps: THREE.MeshBasicMaterial[]; cols: number[]; offset: number }[]
+  /** emissive materials that flicker (shop signs, vending faces) */
+  flickers: THREE.MeshBasicMaterial[]
+  /** lamp halo meshes whose opacity breathes */
+  lamps: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>[]
+}
+
+/** the props group plus its per-frame tick */
+export interface PropsHandle {
+  group: THREE.Group
+  update(t: number): void
+  materials: Record<string, THREE.Material>
+}
+
+function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): PropsHandle {
   const rng = makeRng(31415);
   const group = new THREE.Group();
   scene.add(group);
-  const dyn = { signals: [], flickers: [], lamps: [] };
+  const dyn: PropDynamics = { signals: [], flickers: [], lamps: [] };
 
   const M = {
     metal: toon(COLORS.metal),
@@ -229,7 +273,7 @@ function buildProps(builder, scene, ctx = {}) {
   };
 
   // vending machines
-  function vending(x, z, rotY, accent) {
+  function vending(x: number, z: number, rotY: number, accent: string) {
     const t = vendingTexture(accent);
     const face = glow(0xffffff, 1.12, { map: t });
     dyn.flickers.push(face);
@@ -258,13 +302,14 @@ function buildProps(builder, scene, ctx = {}) {
   vending(11.9, -0.2, Math.PI, '#27b07a');
 
   // bicycles
-  function bicycle(x, z, rotY, frameCol) {
+  function bicycle(x: number, z: number, rotY: number, frameCol: number) {
     const F = toon(frameCol);
     const R = 0.325;
     const cos = Math.cos(rotY), sin = Math.sin(rotY);
     // local (along the frame, up, sideways) -> world
-    const P = (dx, dy, dz) => [x + dx * cos + dz * sin, dy, z - dx * sin + dz * cos];
-    const WR = [0, rotY, 0]; // wheel plane: axis runs across the frame
+    const P = (dx: number, dy: number, dz: number): Vec3 =>
+      [x + dx * cos + dz * sin, dy, z - dx * sin + dz * cos];
+    const WR: Vec3 = [0, rotY, 0]; // wheel plane: axis runs across the frame
 
     // --- wheels: tyre + rim + spokes, no solid disc -------------------------
     for (const dx of [-0.52, 0.52]) {
@@ -281,7 +326,7 @@ function buildProps(builder, scene, ctx = {}) {
     }
 
     // --- frame --------------------------------------------------------------
-    const tube = (a, b, r = 0.022) => {
+    const tube = (a: Vec3, b: Vec3, r = 0.022) => {
       const pa = new THREE.Vector3(...a), pb = new THREE.Vector3(...b);
       const mid = pa.clone().add(pb).multiplyScalar(0.5);
       const len = pa.distanceTo(pb);
@@ -347,13 +392,14 @@ function buildProps(builder, scene, ctx = {}) {
   for (let i = 0; i < 4; i++) {
     const x = -3.05, z = -5.0 - i * 0.62;
     builder.cyl(0.03, 0.03, 0.62, 8, M.steel, { pos: [x, 0.31, z], outline: 0.6 });
-    builder.add(builder.torusGeo(0.16, 0.022, 10, 6, Math.PI), M.steel, {
+    // (upstream passed a 5th `arc` argument that torusGeo never accepted)
+    builder.add(builder.torusGeo(0.16, 0.022, 10, 6), M.steel, {
       pos: [x, 0.62, z], rot: [0, 0, 0], outline: 0.5,
     });
   }
 
   // bins, umbrella stand, sandwich board
-  function bin(x, z, rotY, label) {
+  function bin(x: number, z: number, rotY: number, label: string) {
     const fwd = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY));
     builder.box(0.52, 0.78, 0.46, M.binBody, { pos: [x, 0.39, z], rot: [0, rotY, 0], outline: 1.1 });
     // lid with a slot
@@ -401,7 +447,7 @@ function buildProps(builder, scene, ctx = {}) {
 
   // street lamps, utility poles, wires
   const wireMat = toon(0x151820);
-  function wire(a, b, sag = 0.5, r = 0.016) {
+  function wire(a: Vec3, b: Vec3, sag = 0.5, r = 0.016) {
     const mid = new THREE.Vector3((a[0] + b[0]) / 2, Math.min(a[1], b[1]) - sag, (a[2] + b[2]) / 2);
     const curve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(...a), mid, new THREE.Vector3(...b),
@@ -410,7 +456,7 @@ function buildProps(builder, scene, ctx = {}) {
     builder.add(geo, wireMat, { outline: 0.4 });
   }
 
-  function pole(x, z, h = 8.4) {
+  function pole(x: number, z: number, h = 8.4): { x: number; z: number; h: number } {
     builder.cyl(0.13, 0.17, h, 10, M.concrete, { pos: [x, h / 2, z], outline: 1.1 });
     // crossarms
     for (const [y, w] of [[h - 0.55, 1.5], [h - 1.15, 1.2]]) {
@@ -446,7 +492,7 @@ function buildProps(builder, scene, ctx = {}) {
   wire([p4.x, p4.h - 1.2, p4.z], [9.0, 4.4, -1.2], 0.5, 0.02);
 
   // street lamp on the sidewalk
-  function streetLamp(x, z, rotY = 0, h = 5.2) {
+  function streetLamp(x: number, z: number, rotY = 0, h = 5.2) {
     builder.cyl(0.09, 0.12, h, 10, M.metalDark, { pos: [x, h / 2, z], outline: 1.1 });
     builder.box(0.4, 0.16, 0.4, M.metalDark, { pos: [x, 0.08, z], outline: 0.9 });
     const armX = Math.sin(rotY), armZ = Math.cos(rotY);
@@ -472,7 +518,7 @@ function buildProps(builder, scene, ctx = {}) {
   streetLamp(12.2, 12.0, -Math.PI * 0.35, 5.0);
 
   // traffic signals
-  function signalHead(x, y, z, rotY, scale = 1) {
+  function signalHead(x: number, y: number, z: number, rotY: number, scale = 1) {
     const g = new THREE.Group();
     g.position.set(x, y, z);
     g.rotation.y = rotY;
@@ -576,7 +622,12 @@ function buildProps(builder, scene, ctx = {}) {
   })();
 
   // neighbouring buildings
-  function building(box, floors, seed, opts = {}) {
+  function building(
+    box: { x0: number; x1: number; z0: number; z1: number; h: number },
+    floors: number,
+    seed: number,
+    opts: { lit?: number; base?: string; h?: number; faces?: string } = {},
+  ) {
     const { lit = 0.42, base = '#3a3f4c', h = box.h, faces = '+z,-x,+x,-z' } = opts;
     const w = box.x1 - box.x0, d = box.z1 - box.z0;
     const cx = (box.x0 + box.x1) / 2, cz = (box.z0 + box.z1) / 2;
@@ -661,7 +712,7 @@ function buildProps(builder, scene, ctx = {}) {
   })();
 
   // AC condensers + pipes on the alley walls
-  function acUnit(x, y, z, rotY, w = 0.78) {
+  function acUnit(x: number, y: number, z: number, rotY: number, w = 0.78) {
     builder.box(w, 0.56, 0.34, toon(0xd8d5cc, { ramp: 3 }), { pos: [x, y, z], rot: [0, rotY, 0], outline: 1.0 });
     builder.cyl(0.19, 0.19, 0.05, 12, toon(0x9a978f, { ramp: 3 }), {
       pos: [x + Math.sin(rotY) * 0.18, y, z + Math.cos(rotY) * 0.18], rot: [Math.PI / 2, 0, rotY], outline: 0.7,
@@ -695,7 +746,7 @@ function buildProps(builder, scene, ctx = {}) {
   if (ctx.ground) ctx.ground.addLight([9.4, 2.6, -12.4], [1.0, 0.76, 0.5], 3.6, 0.6);
 
   // animation
-  function update(t) {
+  function update(t: number): void {
     // traffic signal cycle
     for (const s of dyn.signals) {
       const cyc = (t * 0.32 + s.offset) % 1;

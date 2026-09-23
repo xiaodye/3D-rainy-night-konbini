@@ -53,11 +53,19 @@ export interface DioramaHandle {
     shadowMap: { autoUpdate: boolean; needsUpdate: boolean; type: number };
   };
   post: {
-    composite: { material: { uniforms: Record<string, { value: number }> } };
+    /** the composite pass's uniforms — `uExposure` is the one the UI drives */
+    composite: { material: { uniforms: Record<string, { value: any }> } };
   };
   ground: {
-    uniforms: Record<string, { value: number }>;
-    maxSize: number;
+    /**
+     * only the water uniforms the panel writes are declared here. The scene's own
+     * `GroundUniforms` is a superset, which keeps it assignable — note that an
+     * `interface` never gets an implicit index signature, so a mapped type over
+     * this key union is what makes the two line up.
+     */
+    uniforms: Record<WaterUniformKey, { value: number }>;
+    /** reflection target cap in px (optional: the scene keeps its own default) */
+    maxSize?: number;
     rt: { width: number; height: number };
   };
   rain: { setAmount(v: number): void };
@@ -74,6 +82,15 @@ export function getDiorama(): DioramaHandle | null {
 /* ------------------------------------------------------------------ */
 
 export type WaterKey = "wave" | "rip" | "refl" | "dark" | "spark" | "pool" | "rain" | "expo";
+
+/** the ground uniforms the water panel writes (a subset of the shader's bag) */
+export type WaterUniformKey =
+  | "uWaveScale"
+  | "uRipAmp"
+  | "uReflStrength"
+  | "uWaterDark"
+  | "uSparkle"
+  | "uPoolStrength";
 
 export interface WaterParamSpec {
   key: WaterKey;
@@ -99,7 +116,7 @@ export const WATER_PARAMS: WaterParamSpec[] = [
 ];
 
 /** which ground uniform each key maps to (rain / expo are handled separately) */
-const UNIFORM_OF: Partial<Record<WaterKey, string>> = {
+const UNIFORM_OF: Partial<Record<WaterKey, WaterUniformKey>> = {
   wave: "uWaveScale",
   rip: "uRipAmp",
   refl: "uReflStrength",

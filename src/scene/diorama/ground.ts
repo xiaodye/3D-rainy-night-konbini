@@ -1,11 +1,11 @@
-// @ts-nocheck — pending incremental typing (see docs/source-restore.md)
-
 /*
  * Restored from the bundled diorama (see reference/README.md).
  *
  * Mechanically converted back to source: the original module had the same
  * structure, this file just swaps the `window.__M` namespace wiring for ES
  * module imports/exports. The rendering logic itself is unchanged.
+ *
+ * TYPED ✓ — see docs/source-restore.md.
  */
 
 import * as THREE from 'three'
@@ -23,15 +23,18 @@ import { toon, Builder } from './toon'
 const S = 2048; // canvas resolution
 const PX = S / BASE.size;
 
-const wx = (x) => (x + BASE.half) * PX;
-const wz = (z) => (z + BASE.half) * PX;
+const wx = (x: number): number => (x + BASE.half) * PX;
+const wz = (z: number): number => (z + BASE.half) * PX;
 
-function rgba(hex, a = 1) {
+function rgba(hex: number, a = 1): string {
   const c = new THREE.Color(hex);
   return `rgba(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)},${a})`;
 }
 
-function roundRect(ctx, x, y, w, h, r) {
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number, r: number,
+): void {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -44,13 +47,20 @@ function roundRect(ctx, x, y, w, h, r) {
 // ---------------------------------------------------------------------------
 // Canvas paint
 // ---------------------------------------------------------------------------
-function paintGround() {
+/** the two canvases the wet ground samples: albedo + wetness mask */
+export interface GroundMaps {
+  albedo: THREE.CanvasTexture
+  wet: THREE.CanvasTexture
+}
+
+function paintGround(): GroundMaps {
   const cv = document.createElement('canvas');
   cv.width = cv.height = S;
-  const g = cv.getContext('2d');
+  const g = cv.getContext('2d')!;
   const rng = makeRng(20240917);
 
-  const rect = (x0, z0, x1, z1) => [wx(x0), wz(z0), (x1 - x0) * PX, (z1 - z0) * PX];
+  const rect = (x0: number, z0: number, x1: number, z1: number): number[] =>
+    [wx(x0), wz(z0), (x1 - x0) * PX, (z1 - z0) * PX];
 
   // --- 1. everything starts as damp dark ground -----------------------------
   g.fillStyle = rgba(COLORS.asphaltDark);
@@ -58,7 +68,7 @@ function paintGround() {
 
   // base asphalt everywhere (the "outside the streets" areas are mostly hidden
   // under sidewalks and buildings, but the edge of the base should still read)
-  const fill = (x0, z0, x1, z1, col) => {
+  const fill = (x0: number, z0: number, x1: number, z1: number, col: string) => {
     const [a, b, w, h] = rect(x0, z0, x1, z1);
     g.fillStyle = col; g.fillRect(a, b, w, h);
   };
@@ -165,7 +175,7 @@ function paintGround() {
   g.fillRect(wx(-9.94), wz(-13), 0.34 * PX, 17.6 * PX);
 
   // drain grates
-  const grate = (x, z, w, d, rot = 0) => {
+  const grate = (x: number, z: number, w: number, d: number, rot = 0) => {
     g.save();
     g.translate(wx(x), wz(z));
     if (rot) g.rotate(rot);
@@ -185,7 +195,7 @@ function paintGround() {
   grate(-5.15, -7.4, 0.34, 0.9);
 
   // manhole covers
-  const manhole = (x, z, r) => {
+  const manhole = (x: number, z: number, r: number) => {
     g.save(); g.translate(wx(x), wz(z));
     g.fillStyle = 'rgba(30,33,42,0.9)';
     g.beginPath(); g.arc(0, 0, r * PX, 0, Math.PI * 2); g.fill();
@@ -209,7 +219,7 @@ function paintGround() {
   // black = damp, white = standing water / strong mirror
   const wcv = document.createElement('canvas');
   wcv.width = wcv.height = S;
-  const wg = wcv.getContext('2d');
+  const wg = wcv.getContext('2d')!;
   wg.fillStyle = '#6e6e6e'; // damp asphalt everywhere
   wg.fillRect(0, 0, S, S);
   // softer patches of extra dampness
@@ -222,7 +232,7 @@ function paintGround() {
     wg.beginPath(); wg.arc(x, y, r, 0, Math.PI * 2); wg.fill();
   }
 
-  const puddle = (x, z, rx, rz, strength, seed) => {
+  const puddle = (x: number, z: number, rx: number, rz: number, strength: number, seed: number) => {
     const r2 = makeRng(seed);
     wg.save();
     wg.translate(wx(x), wz(z));
@@ -293,11 +303,11 @@ function paintGround() {
 // ---------------------------------------------------------------------------
 // sidewalk tile texture (small tiling canvas)
 // ---------------------------------------------------------------------------
-function tileTexture() {
+function tileTexture(): THREE.CanvasTexture {
   const T = 256;
   const cv = document.createElement('canvas');
   cv.width = cv.height = T;
-  const g = cv.getContext('2d');
+  const g = cv.getContext('2d')!;
   g.fillStyle = rgba(COLORS.sidewalk);
   g.fillRect(0, 0, T, T);
   const rng = makeRng(77);
@@ -503,13 +513,65 @@ const GROUND_FS = /* glsl */`
   }
 `;
 
+/** every uniform the wet-ground shader reads (also the surface our UI tunes) */
+export interface GroundUniforms {
+  tGround: THREE.IUniform<THREE.Texture | null>
+  tWet: THREE.IUniform<THREE.Texture | null>
+  tReflect: THREE.IUniform<THREE.Texture | null>
+  uTextureMatrix: THREE.IUniform<THREE.Matrix4>
+  uFogColor: THREE.IUniform<THREE.Color>
+  uFogDensity: THREE.IUniform<number>
+  uTime: THREE.IUniform<number>
+  uAmbient: THREE.IUniform<THREE.Vector3>
+  uSky: THREE.IUniform<THREE.Vector3>
+  /** rain-ring amplitude */
+  uRipAmp: THREE.IUniform<number>
+  /** slow wave train scale */
+  uWaveScale: THREE.IUniform<number>
+  /** mirror blend strength */
+  uReflStrength: THREE.IUniform<number>
+  /** how dark the water reads */
+  uWaterDark: THREE.IUniform<number>
+  /** crest highlight (HDR) */
+  uSparkle: THREE.IUniform<number>
+  /** pooled light contribution from registered lights */
+  uPoolStrength: THREE.IUniform<number>
+  uDebugRefl: THREE.IUniform<number>
+  uLightPos: THREE.IUniform<THREE.Vector3[]>
+  uLightCol: THREE.IUniform<THREE.Color[]>
+  uLightRad: THREE.IUniform<THREE.Vector2[]>
+  uLightCount: THREE.IUniform<number>
+}
+
 class WetGround extends THREE.Mesh {
-  constructor(renderer, size = BASE.size) {
+  uniforms: GroundUniforms
+  renderer: THREE.WebGLRenderer
+  textureMatrix: THREE.Matrix4
+  /** planar-reflection render target */
+  rt: THREE.WebGLRenderTarget
+  virtualCamera: THREE.PerspectiveCamera
+  clipPlane: THREE.Plane
+  normal: THREE.Vector3
+  view: THREE.Vector3
+  target: THREE.Vector3
+  /** where the mirrored camera should aim (named to avoid clashing with Object3D.lookAt()) */
+  lookPoint: THREE.Vector3
+  rot: THREE.Matrix4
+  rwp: THREE.Vector3
+  cwp: THREE.Vector3
+  /** objects hidden during the mirror pass (e.g. the plinth below the waterline) */
+  hideInMirror: THREE.Object3D[]
+  clearColor: THREE.Color
+  /** reflection target cap in px — set by the quality preset */
+  maxSize?: number
+  _lights: number
+
+  constructor(renderer: THREE.WebGLRenderer, size = BASE.size) {
     const geo = new THREE.PlaneGeometry(size, size, 1, 1);
     geo.rotateX(-Math.PI / 2);
     const textureMatrix = new THREE.Matrix4();
     const maps = paintGround();
-    const uniforms = {
+    const uniforms: GroundUniforms = {
       tGround: { value: null },
       tWet: { value: null },
       tReflect: { value: null },
@@ -532,7 +594,12 @@ class WetGround extends THREE.Mesh {
       uLightCount: { value: 0 },
     };
     const mat = new THREE.ShaderMaterial({
-      vertexShader: GROUND_VS, fragmentShader: GROUND_FS, uniforms, fog: false,
+      vertexShader: GROUND_VS,
+      fragmentShader: GROUND_FS,
+      // GroundUniforms is deliberately precise (no index signature), so widen
+      // only here, at the boundary with three's uniform bag
+      uniforms: uniforms as unknown as { [uniform: string]: THREE.IUniform },
+      fog: false,
     });
     super(geo, mat);
     this.frustumCulled = false;
@@ -558,7 +625,7 @@ class WetGround extends THREE.Mesh {
     this.normal = new THREE.Vector3();
     this.view = new THREE.Vector3();
     this.target = new THREE.Vector3();
-    this.lookAt = new THREE.Vector3();
+    this.lookPoint = new THREE.Vector3();
     this.rot = new THREE.Matrix4();
     this.rwp = new THREE.Vector3();
     this.cwp = new THREE.Vector3();
@@ -570,7 +637,7 @@ class WetGround extends THREE.Mesh {
     renderer.clippingPlanes = [this.clipPlane];
   }
 
-  setSize(w, h) {
+  setSize(w: number, h: number): void {
     const s = Math.min(this.maxSize || 896, Math.max(512, Math.round(Math.max(w, h) * 0.55)));
     if (this.rt.width !== s) {
       this.rt.setSize(s, s);
@@ -579,19 +646,29 @@ class WetGround extends THREE.Mesh {
     }
   }
 
-  addLight(pos, color, radius, intensity) {
+  /**
+   * Register a ground light for the reflection/pool shading (max 8).
+   *
+   * NOTE: callers pass `[r, g, b]` arrays, but `THREE.Color.set()` only accepts
+   * Color | number | string — an array argument is silently ignored, so the
+   * light colour currently stays black. Behaviour left untouched on purpose
+   * (fixing it changes how the wet ground reads); flagged in
+   * docs/source-restore.md.
+   */
+  addLight(pos: number[], color: number[] | number | string, radius: number, intensity: number): void {
     const i = this._lights++;
     if (i >= 8) return;
     this.uniforms.uLightPos.value[i].set(pos[0], pos[1], pos[2]);
-    this.uniforms.uLightCol.value[i].set(color);
+    // cast keeps the upstream behaviour: Color.set() ignores array arguments
+    this.uniforms.uLightCol.value[i].set(color as THREE.ColorRepresentation);
     this.uniforms.uLightRad.value[i].set(radius, intensity);
     this.uniforms.uLightCount.value = this._lights;
   }
 
-  update(t) { this.uniforms.uTime.value = t; }
+  update(t: number): void { this.uniforms.uTime.value = t; }
 
   /** Renders the mirror target. Call once per frame, before the main render. */
-  renderMirror(scene, camera) {
+  renderMirror(scene: THREE.Scene, camera: THREE.PerspectiveCamera): void {
     const renderer = this.renderer;
     const u = this.uniforms;
     this.rwp.setFromMatrixPosition(this.matrixWorld);
@@ -603,8 +680,8 @@ class WetGround extends THREE.Mesh {
     this.view.reflect(this.normal).negate().add(this.rwp);
 
     this.rot.extractRotation(camera.matrixWorld);
-    this.lookAt.set(0, 0, -1).applyMatrix4(this.rot).add(this.cwp);
-    this.target.subVectors(this.rwp, this.lookAt);
+    this.lookPoint.set(0, 0, -1).applyMatrix4(this.rot).add(this.cwp);
+    this.target.subVectors(this.rwp, this.lookPoint);
     this.target.reflect(this.normal).negate().add(this.rwp);
 
     const vc = this.virtualCamera;
@@ -650,7 +727,7 @@ class WetGround extends THREE.Mesh {
     this.visible = prevVisible;
   }
 
-  _reflect() {
+  _reflect(): void {
     // mirrors are driven from the main loop via renderMirror()
   }
 }
@@ -658,7 +735,11 @@ class WetGround extends THREE.Mesh {
 // ---------------------------------------------------------------------------
 // assemble base + sidewalks + curbs
 // ---------------------------------------------------------------------------
-function buildGround(builder, renderer, scene) {
+function buildGround(
+  builder: Builder,
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+): { ground: WetGround } {
   const tileTex = tileTexture();
 
   // --- wet ground ----------------------------------------------------------
@@ -669,7 +750,7 @@ function buildGround(builder, renderer, scene) {
   // --- plinth (stepped, collectible-model feel) ----------------------------
   // kept in its own merged group so it can be hidden while the mirror renders
   const plinthBuilder = new Builder();
-  const plinth = (w, h, d, y, col) => {
+  const plinth = (w: number, h: number, d: number, y: number, col: number) => {
     plinthBuilder.box(w, h, d, toon(col, { ramp: 3 }), { pos: [0, y, 0], outline: 0 });
   };
   // NOTE: the top slab stops 2cm below y=0 — it must never be coplanar with the
@@ -685,7 +766,7 @@ function buildGround(builder, renderer, scene) {
   // --- sidewalks -----------------------------------------------------------
   const H = STREET.curbH;
 
-  const slab = (x0, z0, x1, z1, texScale = 1.35) => {
+  const slab = (x0: number, z0: number, x1: number, z1: number, texScale = 1.35) => {
     const w = x1 - x0, d = z1 - z0;
     const t = tileTex.clone();
     t.needsUpdate = true;
@@ -704,7 +785,7 @@ function buildGround(builder, renderer, scene) {
 
   // curb noses (slightly lighter, catches the street light)
   const curbMat = toon(COLORS.curb, { ramp: 3 });
-  const curb = (x0, z0, x1, z1) => {
+  const curb = (x0: number, z0: number, x1: number, z1: number) => {
     builder.box(x1 - x0, H + 0.04, z1 - z0, curbMat, {
       pos: [(x0 + x1) / 2, (H + 0.04) / 2, (z0 + z1) / 2], outline: 1.0,
     });

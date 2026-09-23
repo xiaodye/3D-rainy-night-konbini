@@ -1,17 +1,19 @@
-// @ts-nocheck — pending incremental typing (see docs/source-restore.md)
-
 /*
  * Restored from the bundled diorama (see reference/README.md).
  *
  * Mechanically converted back to source: the original module had the same
  * structure, this file just swaps the `window.__M` namespace wiring for ES
  * module imports/exports. The rendering logic itself is unchanged.
+ *
+ * TYPED ✓ — see docs/source-restore.md.
  */
 
 import * as THREE from 'three'
 
 import { STORE, COLORS, makeRng, lerp, clamp } from './config'
-import { toon, glow, additive } from './toon'
+import { toon, glow, additive, Builder } from './toon'
+import type { Vec3 } from './toon'
+import type { WetGround } from './ground'
 
 // ---------------------------------------------------------------------------
 // The convenience store: shell, illuminated signage, glass storefront, and a
@@ -32,15 +34,15 @@ const GY1 = STORE.glassTop; // 2.95
 // ---------------------------------------------------------------------------
 // canvas art helpers
 // ---------------------------------------------------------------------------
-function cvs(w, h) {
+function cvs(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
-  return [c, c.getContext('2d')];
+  return [c, c.getContext('2d')!];
 }
 const JP = '"Yu Gothic","YuGothic","MS Gothic","Meiryo",sans-serif';
 const EN = '"Segoe UI","Helvetica Neue",Arial,sans-serif';
 
-function tex(c, srgb = true) {
+function tex(c: HTMLCanvasElement, srgb = true): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c);
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
@@ -48,7 +50,10 @@ function tex(c, srgb = true) {
   return t;
 }
 
-function roundRect(g, x, y, w, h, r) {
+function roundRect(
+  g: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number, r: number,
+): void {
   g.beginPath();
   g.moveTo(x + r, y);
   g.arcTo(x + w, y, x + w, y + h, r);
@@ -59,7 +64,7 @@ function roundRect(g, x, y, w, h, r) {
 }
 
 /** Big fascia sign: brand block on the left, name + 24H badge on the right. */
-function fasciaTexture() {
+function fasciaTexture(): THREE.CanvasTexture {
   const W = 2048, Hh = 256;
   const [c, g] = cvs(W, Hh);
   const bg = g.createLinearGradient(0, 0, 0, Hh);
@@ -120,7 +125,7 @@ function fasciaTexture() {
 }
 
 /** Vertical pylon sign (Japanese street-corner style). */
-function pylonTexture() {
+function pylonTexture(): THREE.CanvasTexture {
   const W = 256, Hh = 1024;
   const [c, g] = cvs(W, Hh);
   g.fillStyle = '#f7f9fd'; g.fillRect(0, 0, W, Hh);
@@ -148,7 +153,7 @@ function pylonTexture() {
   return tex(c);
 }
 
-function posterTexture(seed, hue) {
+function posterTexture(seed: number, hue: number): THREE.CanvasTexture {
   const W = 320, Hh = 448;
   const [c, g] = cvs(W, Hh);
   const rng = makeRng(seed);
@@ -178,7 +183,7 @@ function posterTexture(seed, hue) {
   return tex(c);
 }
 
-function interiorFloorTexture() {
+function interiorFloorTexture(): THREE.CanvasTexture {
   const S = 1024;
   const [c, g] = cvs(S, S);
   g.fillStyle = '#ded7c9'; g.fillRect(0, 0, S, S);
@@ -200,7 +205,7 @@ function interiorFloorTexture() {
   }
   // green guide arrows pointing to the register
   g.fillStyle = 'rgba(38,150,110,0.5)';
-  const arrow = (x, y, rot) => {
+  const arrow = (x: number, y: number, rot: number) => {
     g.save(); g.translate(x, y); g.rotate(rot);
     g.beginPath();
     g.moveTo(0, -46); g.lineTo(34, -6); g.lineTo(14, -6); g.lineTo(14, 46);
@@ -214,7 +219,7 @@ function interiorFloorTexture() {
   return tex(c);
 }
 
-function productColor(i, rng) {
+function productColor(i: number, rng: () => number): number {
   const pal = [
     0xe8402f, 0xf59a1e, 0xf5d33a, 0x36a862, 0x2b7fe0, 0x6b4fd6, 0xd63f92,
     0xf2f0e8, 0x7fd4e8, 0x8a5a3a, 0xf07ba8, 0x3fc8b4, 0xd13a3a, 0xfaf6ea,
@@ -290,7 +295,7 @@ const GLASS_FS = /* glsl */`
   }
 `;
 
-function glassMaterial(tint = 0x9fc6e8, scale = [3, 2]) {
+function glassMaterial(tint = 0x9fc6e8, scale: [number, number] = [3, 2]): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     vertexShader: GLASS_VS, fragmentShader: GLASS_FS,
     transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
@@ -305,11 +310,36 @@ function glassMaterial(tint = 0x9fc6e8, scale = [3, 2]) {
 }
 
 // ---------------------------------------------------------------------------
-function buildStore(builder, scene, ctx = {}) {
+/** what the store needs from its caller */
+export interface StoreCtx {
+  ground?: WetGround
+  /** pin the automatic doors open (the `?door` debug flag) */
+  forceDoor?: boolean
+}
+
+/** animated state the store keeps between frames */
+interface StoreDynamics {
+  /** the rain-streaked glass shaders, ticked every frame */
+  glassMats: THREE.ShaderMaterial[]
+  doors: { left: THREE.Object3D; right: THREE.Object3D; x0: number; x1: number }[]
+  lights: THREE.PointLight[]
+  /** emissive materials that flicker (shop signs, pylon face) */
+  flickers: THREE.MeshBasicMaterial[]
+}
+
+/** the store group, its per-frame tick and the shared glass material */
+export interface StoreHandle {
+  group: THREE.Group
+  update(t: number, dt: number, camera?: THREE.Camera): void
+  materials: Record<string, THREE.Material>
+  glassMat: THREE.ShaderMaterial
+}
+
+function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): StoreHandle {
   const rng = makeRng(5150);
   const group = new THREE.Group();
   scene.add(group);
-  const dynamic = { glassMats: [], doors: [], lights: [], flickers: [] };
+  const dynamic: StoreDynamics = { glassMats: [], doors: [], lights: [], flickers: [] };
 
   const M = {
     wall: toon(COLORS.wall),
@@ -373,7 +403,7 @@ function buildStore(builder, scene, ctx = {}) {
   for (let x = X0 + 1.6; x < X1; x += 2.2) {
     builder.box(0.05, 0.03, Z1 - Z0, M.roofSeam, { pos: [x, H + 0.005, (Z0 + Z1) / 2], outline: 0 });
   }
-  const parapet = (w, d, x, z) => {
+  const parapet = (w: number, d: number, x: number, z: number) => {
     builder.box(w, 0.34, d, M.wall, { pos: [x, H + 0.17, z], outline: 1.1 });
     builder.box(w + 0.06, 0.06, d + 0.06, M.metalDark, { pos: [x, H + 0.36, z], outline: 0.8 });
   };
@@ -432,7 +462,7 @@ function buildStore(builder, scene, ctx = {}) {
   const glassMat = glassMaterial(0x9fc6e8, [4, 1.6]);
   dynamic.glassMats.push(glassMat);
   const mull = M.metalDark;
-  const mullion = (x, w = 0.09) => builder.box(w, GY1 - GY0, 0.12, mull, {
+  const mullion = (x: number, w = 0.09) => builder.box(w, GY1 - GY0, 0.12, mull, {
     pos: [x, (GY0 + GY1) / 2, FRONT - 0.06], outline: 0.8,
   });
   // top and bottom rails
@@ -454,7 +484,7 @@ function buildStore(builder, scene, ctx = {}) {
   const doorGlassL = glassMaterial(0x9fc6e8, [1.2, 1.6]);
   const doorGlassR = glassMaterial(0x9fc6e8, [1.2, 1.6]);
   dynamic.glassMats.push(doorGlassL, doorGlassR);
-  const doorFrame = (x) => {
+  const doorFrame = (x: number) => {
     const g = new THREE.Group();
     g.position.set(x, 0, FRONT - 0.05);
     group.add(g);
@@ -462,7 +492,7 @@ function buildStore(builder, scene, ctx = {}) {
   };
   const dl = doorFrame(DOOR_X0 + 0.5);
   const dr = doorFrame(DOOR_X1 - 0.5);
-  const doorPanel = (parent, mat, sign) => {
+  const doorPanel = (parent: THREE.Object3D, mat: THREE.Material, sign: boolean) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(1.0, GY1 - GY0 - 0.06, 0.05), mat);
     m.position.set(0, (GY0 + GY1) / 2, 0);
     parent.add(m);
@@ -515,7 +545,11 @@ function buildStore(builder, scene, ctx = {}) {
   }
 
   // 5. interior fittings
-  const prod = (x, y, z, w, h, d, col, outline = 0.7) =>
+  const prod = (
+    x: number, y: number, z: number,
+    w: number, h: number, d: number,
+    col: number, outline = 0.7,
+  ) =>
     builder.box(w, h, d, toon(col, { emissive: new THREE.Color(col).multiplyScalar(0.16).getHex() }), {
       pos: [x, y, z], outline,
     });
@@ -571,7 +605,7 @@ function buildStore(builder, scene, ctx = {}) {
   });
 
   // --- gondola shelf runs ---------------------------------------------------
-  const shelfRun = (x0, z0, z1) => {
+  const shelfRun = (x0: number, z0: number, z1: number) => {
     const w = 1.32, len = z1 - z0, cx = x0 + w / 2, cz = (z0 + z1) / 2;
     builder.box(w, 0.09, len, M.shelf, { pos: [cx, FLOOR + 0.09, cz], outline: 0.9 });
     builder.box(w - 0.1, 0.06, len - 0.06, M.shelfEdge, { pos: [cx, FLOOR + 0.2, cz], outline: 0.6 });
@@ -741,7 +775,7 @@ function buildStore(builder, scene, ctx = {}) {
   }
 
   // 6. lights
-  const mk = (x, y, z, col, i, d) => {
+  const mk = (x: number, y: number, z: number, col: number, i: number, d: number) => {
     const l = new THREE.PointLight(col, i, d, 2.0);
     l.position.set(x, y, z);
     scene.add(l);
@@ -770,7 +804,7 @@ function buildStore(builder, scene, ctx = {}) {
   let doorState = 0;
   let doorTimer = 3.5;
 
-  function update(t, dt, camera) {
+  function update(t: number, dt: number, camera?: THREE.Camera): void {
     if (camera) camera.getWorldPosition(cam);
     for (const m of dynamic.glassMats) m.uniforms.uTime.value = t;
 

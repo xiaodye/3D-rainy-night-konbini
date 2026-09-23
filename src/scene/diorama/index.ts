@@ -1,5 +1,3 @@
-// @ts-nocheck — pending incremental typing (see docs/source-restore.md)
-
 /*
  * Restored from the bundled diorama (see reference/README.md).
  *
@@ -14,6 +12,8 @@
  *      into the water uniforms are now applied directly, so `?wave=1.4` and
  *      friends still work exactly as before. Its MSAA default is also lowered
  *      from 4 to 2 (see docs/performance-report.md).
+ *
+ * TYPED ✓ — see docs/source-restore.md.
  */
 
 import * as THREE from 'three'
@@ -26,12 +26,38 @@ import { buildStore } from './store'
 import { buildProps } from './props'
 import { buildRain } from './rain'
 import { PostFX } from './postfx'
+import type { BuildStats } from './toon'
+import type { Sky } from './sky'
+import type { StoreHandle } from './store'
+import type { PropsHandle } from './props'
+import type { RainHandle } from './rain'
 import type { DioramaHandle } from './adapter'
 
 // re-export the adapter surface so `from './diorama'` keeps working
 export * from './adapter'
 
-let handle: DioramaHandle | null = null
+declare global {
+  interface Window {
+    /** published by bootDiorama() for the diagnostic scripts and screenshot tooling */
+    __DIORAMA?: DioramaScene
+  }
+}
+
+/**
+ * Everything a caller (or the diagnostic scripts) may want to poke at.
+ * A superset of `DioramaHandle`, which is the minimal surface the UI needs.
+ */
+export interface DioramaScene extends DioramaHandle {
+  scene: THREE.Scene
+  stats: BuildStats
+  sky: Sky
+  store: StoreHandle
+  props: PropsHandle
+  rain: RainHandle
+  THREE: typeof THREE
+}
+
+let handle: DioramaScene | null = null
 
 /**
  * Build the diorama and start its render loop. Idempotent: repeated calls
@@ -39,15 +65,15 @@ let handle: DioramaHandle | null = null
  *
  * Requires `<canvas id="scene">` to be in the document.
  */
-export function bootDiorama(): DioramaHandle {
+export function bootDiorama(): DioramaScene {
   if (handle) return handle
 
   // --- query params (debug views / deterministic captures) -------------------
   const qs = new URLSearchParams(location.search);
-  const num = (k, d) => (qs.has(k) ? parseFloat(qs.get(k)) : d);
+  const num = (k: string, d: number): number => (qs.has(k) ? parseFloat(qs.get(k) as string) : d);
 
   // --- renderer --------------------------------------------------------------
-  const canvas = document.getElementById('scene');
+  const canvas = document.getElementById('scene') as HTMLCanvasElement;
   const renderer = new THREE.WebGLRenderer({
     canvas, antialias: false, powerPreference: 'high-performance', alpha: false, stencil: false,
   });
@@ -140,7 +166,7 @@ export function bootDiorama(): DioramaHandle {
   post.composite.material.uniforms.uExposure.value = num('expo', 1.62);
 
   // --- camera framing --------------------------------------------------------
-  function fitCamera(azDeg, elDeg, dist) {
+  function fitCamera(azDeg: number, elDeg: number, dist: number): void {
     const az = THREE.MathUtils.degToRad(azDeg);
     const el = THREE.MathUtils.degToRad(elDeg);
     const r = dist;
@@ -154,7 +180,7 @@ export function bootDiorama(): DioramaHandle {
 
   const DEFAULT_AZ = 24;
   const DEFAULT_EL = 18;
-  function defaultDistance() {
+  function defaultDistance(): number {
     const aspect = innerWidth / innerHeight;
     return THREE.MathUtils.clamp(46 * (1.80 / aspect) ** 0.5, 30, 78);
   }
@@ -168,7 +194,7 @@ export function bootDiorama(): DioramaHandle {
   }
 
   // --- resize ----------------------------------------------------------------
-  function resize() {
+  function resize(): void {
     const w = innerWidth, h = innerHeight;
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
@@ -185,7 +211,7 @@ export function bootDiorama(): DioramaHandle {
   const frozen = qs.has('t');
   let elapsed = 0;
 
-  function frame() {
+  function frame(): void {
     const dt = Math.min(clock.getDelta(), 0.05);
     elapsed = frozen ? num('t', 0) : elapsed + dt;
 
@@ -193,7 +219,8 @@ export function bootDiorama(): DioramaHandle {
     sky.update(elapsed, camera);
     ground.update(elapsed);
     if (store.update) store.update(elapsed, dt, camera);
-    if (props.update) props.update(elapsed, dt, camera);
+    // the props tick only depends on time (the extra args were always ignored)
+    if (props.update) props.update(elapsed);
     if (rain.update) rain.update(elapsed, dt, camera);
 
     ground.renderMirror(scene, camera);
@@ -215,8 +242,11 @@ export function bootDiorama(): DioramaHandle {
   // --- handle ----------------------------------------------------------------
   // Kept on window as well: the diagnostic scripts in docs/performance-report.md
   // and the screenshot tooling read it from there.
-  handle = { scene, camera, controls, renderer, post, stats, fitCamera, ground, store, props, rain, THREE };
-  window.__DIORAMA = handle;
+  const diorama: DioramaScene = {
+    scene, camera, controls, renderer, post, stats, fitCamera, ground, store, props, rain, sky, THREE,
+  };
+  handle = diorama;
+  window.__DIORAMA = diorama;
 
-  return handle;
+  return diorama;
 }

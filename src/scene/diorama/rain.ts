@@ -1,16 +1,17 @@
-// @ts-nocheck — pending incremental typing (see docs/source-restore.md)
-
 /*
  * Restored from the bundled diorama (see reference/README.md).
  *
  * Mechanically converted back to source: the original module had the same
  * structure, this file just swaps the `window.__M` namespace wiring for ES
  * module imports/exports. The rendering logic itself is unchanged.
+ *
+ * TYPED ✓ — see docs/source-restore.md.
  */
 
 import * as THREE from 'three'
 
 import { makeRng } from './config'
+import type { WetGround } from './ground'
 
 // ---------------------------------------------------------------------------
 // Rain: falling streaks, ground splashes and drips off the awnings / eaves.
@@ -20,10 +21,10 @@ import { makeRng } from './config'
 const BOX = 30;      // rain volume tile size — centred on the diorama, not the camera
 const HEIGHT = 26;
 
-function streakTexture() {
+function streakTexture(): THREE.CanvasTexture {
   const cv = document.createElement('canvas');
   cv.width = 16; cv.height = 128;
-  const g = cv.getContext('2d');
+  const g = cv.getContext('2d')!;
   const grd = g.createLinearGradient(0, 0, 0, 128);
   grd.addColorStop(0.0, 'rgba(255,255,255,0)');
   grd.addColorStop(0.35, 'rgba(255,255,255,0.35)');
@@ -36,11 +37,11 @@ function streakTexture() {
   return tex;
 }
 
-function ringTexture() {
+function ringTexture(): THREE.CanvasTexture {
   const S = 64;
   const cv = document.createElement('canvas');
   cv.width = cv.height = S;
-  const g = cv.getContext('2d');
+  const g = cv.getContext('2d')!;
   g.clearRect(0, 0, S, S);
   g.strokeStyle = 'rgba(255,255,255,0.9)';
   g.lineWidth = 4;
@@ -177,7 +178,18 @@ const DRIP_FS = /* glsl */`
   }
 `;
 
-function buildRain(scene, { ground, splash: wantSplash = true } = {}) {
+/** live rain system: set its density, tick it every frame */
+export interface RainHandle {
+  group: THREE.Group
+  /** 0 = no rain, 1 = default, >1 = heavier */
+  setAmount(v: number): void
+  update(t: number, dt: number, camera: THREE.Camera): void
+}
+
+function buildRain(
+  scene: THREE.Scene,
+  { ground, splash: wantSplash = true }: { ground?: WetGround; splash?: boolean } = {},
+): RainHandle {
   const rng = makeRng(9182);
   const group = new THREE.Group();
   scene.add(group);
@@ -299,7 +311,7 @@ function buildRain(scene, { ground, splash: wantSplash = true } = {}) {
   return {
     group,
     /** 0 = 无雨, 1 = 默认, >1 = 更大 */
-    setAmount(v) {
+    setAmount(v: number): void {
       const k = Math.max(0, v);
       rainMat.uniforms.uOpacity.value = 0.78 * k;
       splashMat.uniforms.uOpacity.value = k;
@@ -308,7 +320,7 @@ function buildRain(scene, { ground, splash: wantSplash = true } = {}) {
       splash.visible = wantSplash && k > 0.01;
       drip.visible = k > 0.01;
     },
-    update(t, dt, camera) {
+    update(t: number, dt: number, camera: THREE.Camera): void {
       camera.getWorldPosition(cam);
       rainMat.uniforms.uTime.value = t;
       rainMat.uniforms.uCam.value.copy(cam);

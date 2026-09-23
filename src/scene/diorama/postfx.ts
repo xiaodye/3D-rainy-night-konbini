@@ -1,11 +1,11 @@
-// @ts-nocheck — pending incremental typing (see docs/source-restore.md)
-
 /*
  * Restored from the bundled diorama (see reference/README.md).
  *
  * Mechanically converted back to source: the original module had the same
  * structure, this file just swaps the `window.__M` namespace wiring for ES
  * module imports/exports. The rendering logic itself is unchanged.
+ *
+ * TYPED ✓ — see docs/source-restore.md.
  */
 
 import * as THREE from 'three'
@@ -110,14 +110,19 @@ const COMPOSITE_FS = /* glsl */`
 `;
 
 class Pass {
-  constructor(material) {
+  material: THREE.ShaderMaterial
+  mesh: THREE.Mesh
+  scene: THREE.Scene
+  camera: THREE.OrthographicCamera
+
+  constructor(material: THREE.ShaderMaterial) {
     this.material = material;
     this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
     this.scene = new THREE.Scene();
     this.scene.add(this.mesh);
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   }
-  render(renderer, target) {
+  render(renderer: THREE.WebGLRenderer, target?: THREE.WebGLRenderTarget | null): void {
     renderer.setRenderTarget(target || null);
     renderer.clear(true, false, false);
     renderer.render(this.scene, this.camera);
@@ -125,7 +130,20 @@ class Pass {
 }
 
 class PostFX {
-  constructor(renderer, samples = 4) {
+  renderer: THREE.WebGLRenderer
+  sceneRT: THREE.WebGLRenderTarget
+  brightRT: THREE.WebGLRenderTarget
+  /** three mip levels of the gaussian chain (4×, 8×, 16× down) */
+  blurA: THREE.WebGLRenderTarget[]
+  blurB: THREE.WebGLRenderTarget[]
+  brightPass: Pass
+  blurPass: Pass
+  /** final filmic pass — its uniforms carry `uBloom` and the `uExposure` our UI drives */
+  composite: Pass
+  /** [width, height] of the scene target in device pixels */
+  size: [number, number] = [1, 1]
+
+  constructor(renderer: THREE.WebGLRenderer, samples = 4) {
     this.renderer = renderer;
     const rtOpts = { type: THREE.HalfFloatType, depthBuffer: true, stencilBuffer: false, samples };
     this.sceneRT = new THREE.WebGLRenderTarget(1, 1, rtOpts);
@@ -159,7 +177,7 @@ class PostFX {
     this.setSize(1, 1);
   }
 
-  setSize(w, h) {
+  setSize(w: number, h: number): void {
     const dpr = this.renderer.getPixelRatio();
     const W = Math.max(1, Math.floor(w * dpr));
     const H = Math.max(1, Math.floor(h * dpr));
@@ -174,7 +192,7 @@ class PostFX {
     this.size = [W, H];
   }
 
-  render(scene, camera, time) {
+  render(scene: THREE.Scene, camera: THREE.Camera, time: number): void {
     const r = this.renderer;
     const prevAutoClear = r.autoClear;
     r.autoClear = true;

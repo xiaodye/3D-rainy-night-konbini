@@ -1,11 +1,13 @@
-// @ts-nocheck — pending incremental typing (see docs/source-restore.md)
-
 /*
  * Restored from the bundled diorama (see reference/README.md).
  *
  * Mechanically converted back to source: the original module had the same
  * structure, this file just swaps the `window.__M` namespace wiring for ES
  * module imports/exports. The rendering logic itself is unchanged.
+ *
+ * TYPED ✓ — see docs/source-restore.md. The types here are the contract the
+ * whole scene is built on: `SurfaceOpts` / `GlowOpts` / `AdditiveOpts` for the
+ * material factories, `PieceOpts` for placement, and the `Builder` API below.
  */
 
 import * as THREE from 'three'
@@ -20,7 +22,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 
 // --- gradient ramp -----------------------------------------------------------
 const _ramps = new Map();
-function gradientMap(steps = 4) {
+function gradientMap(steps = 4): THREE.DataTexture {
   if (_ramps.has(steps)) return _ramps.get(steps);
   const data = new Uint8Array(steps * 4);
   for (let i = 0; i < steps; i++) {
@@ -40,15 +42,72 @@ function gradientMap(steps = 4) {
 }
 
 // --- material cache ----------------------------------------------------------
-const _matCache = new Map();
-function cache(key, make) {
-  let m = _matCache.get(key);
+const _matCache = new Map<string, THREE.Material>();
+function cache<T extends THREE.Material>(key: string, make: () => T): T {
+  let m = _matCache.get(key) as T | undefined;
   if (!m) { m = make(); _matCache.set(key, m); }
   return m;
 }
 
+/** a position / rotation / scale triple (degrees for rotations) */
+export type Vec3 = [number, number, number]
+
+/** cel-shaded surface options */
+export interface SurfaceOpts {
+  /** self-illumination colour; also what makes a surface bloom */
+  emissive?: number
+  emissiveIntensity?: number
+  flat?: boolean
+  side?: THREE.Side
+  opacity?: number
+  transparent?: boolean
+  map?: THREE.Texture | null
+  depthWrite?: boolean
+  /** number of toon light bands (1–4) */
+  ramp?: number
+  vertexColors?: boolean
+  fog?: boolean
+}
+
+/** unlit / self-illuminated surface options */
+export interface GlowOpts {
+  side?: THREE.Side
+  opacity?: number
+  transparent?: boolean
+  map?: THREE.Texture | null
+  fog?: boolean
+  depthWrite?: boolean
+}
+
+/** additive glow card options */
+export interface AdditiveOpts {
+  map?: THREE.Texture | null
+  opacity?: number
+  depthWrite?: boolean
+}
+
+/** where to drop a piece inside the Builder */
+export interface PieceOpts {
+  pos?: Vec3
+  rot?: Vec3
+  scale?: Vec3
+  /** outline width multiplier (0 = no outline) */
+  outline?: number
+  /** skip merging and keep a live mesh — required for anything animated */
+  dynamic?: boolean
+  parent?: THREE.Object3D | null
+  name?: string
+}
+
+/** what `Builder.finalize()` reports (also published as `data-stats`) */
+export interface BuildStats {
+  buckets: number
+  meshes: number
+  tris: number
+}
+
 /** Cel-shaded surface. */
-function toon(color, opts = {}) {
+function toon(color: number, opts: SurfaceOpts = {}): THREE.MeshToonMaterial {
   const {
     emissive = 0x000000, emissiveIntensity = 1, flat = false, side = THREE.FrontSide,
     opacity = 1, transparent = false, map = null, depthWrite = true, ramp = 4,
@@ -56,10 +115,11 @@ function toon(color, opts = {}) {
   } = opts;
   const key = `T|${color}|${emissive}|${emissiveIntensity}|${flat}|${side}|${opacity}|${transparent}|${map ? map.uuid : 0}|${ramp}|${vertexColors}|${fog}`;
   return cache(key, () => {
-    const m = new THREE.MeshToonMaterial({
+    const params = {
       color, gradientMap: gradientMap(ramp), side, opacity, transparent, depthWrite,
       vertexColors, fog, flatShading: !!flat,
-    });
+    } as THREE.MeshToonMaterialParameters;
+    const m = new THREE.MeshToonMaterial(params);
     if (map) m.map = map;
     if (emissive) { m.emissive = new THREE.Color(emissive); m.emissiveIntensity = emissiveIntensity; }
     return m;
@@ -67,7 +127,7 @@ function toon(color, opts = {}) {
 }
 
 /** Unlit / self-illuminated surface. intensity > 1 goes HDR for the bloom pass. */
-function glow(color, intensity = 1, opts = {}) {
+function glow(color: number, intensity = 1, opts: GlowOpts = {}): THREE.MeshBasicMaterial {
   const { side = THREE.FrontSide, opacity = 1, transparent = false, map = null, fog = false, depthWrite = true } = opts;
   const key = `G|${color}|${intensity}|${side}|${opacity}|${transparent}|${map ? map.uuid : 0}|${fog}|${depthWrite}`;
   return cache(key, () => {
@@ -79,7 +139,7 @@ function glow(color, intensity = 1, opts = {}) {
 }
 
 /** Additive glow card (light halos, light shafts, wet streaks). */
-function additive(color, intensity = 1, opts = {}) {
+function additive(color: number, intensity = 1, opts: AdditiveOpts = {}): THREE.MeshBasicMaterial {
   const { map = null, opacity = 1, depthWrite = false } = opts;
   const key = `A|${color}|${intensity}|${map ? map.uuid : 0}|${opacity}|${depthWrite}`;
   return cache(key, () => {
@@ -93,13 +153,13 @@ function additive(color, intensity = 1, opts = {}) {
 }
 
 // --- radial glow sprite ------------------------------------------------------
-let _glowTex = null;
-function glowTexture() {
+let _glowTex: THREE.CanvasTexture | null = null;
+function glowTexture(): THREE.CanvasTexture {
   if (_glowTex) return _glowTex;
   const S = 128;
   const cv = document.createElement('canvas');
   cv.width = cv.height = S;
-  const g = cv.getContext('2d');
+  const g = cv.getContext('2d')!;
   const grd = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
   grd.addColorStop(0.0, 'rgba(255,255,255,1)');
   grd.addColorStop(0.28, 'rgba(255,255,255,0.55)');
@@ -139,7 +199,7 @@ const OUTLINE_MAT = new THREE.ShaderMaterial({
 });
 
 // --- geometry normalisation --------------------------------------------------
-function prep(geo, outline) {
+function prep(geo: THREE.BufferGeometry, outline: number): THREE.BufferGeometry {
   let g = geo.index ? geo.toNonIndexed() : geo;
   if (g === geo) g = geo.clone();
   if (!g.attributes.normal) g.computeVertexNormals();
@@ -158,7 +218,7 @@ const _e = new THREE.Euler();
 const _v = new THREE.Vector3();
 const _s = new THREE.Vector3();
 
-function xform(pos, rot, scale) {
+function xform(pos?: Vec3, rot?: Vec3, scale?: Vec3): THREE.Matrix4 {
   _v.set(pos ? pos[0] : 0, pos ? pos[1] : 0, pos ? pos[2] : 0);
   _e.set(rot ? rot[0] : 0, rot ? rot[1] : 0, rot ? rot[2] : 0);
   _q.setFromEuler(_e);
@@ -170,6 +230,14 @@ function xform(pos, rot, scale) {
 // Builder: author freely, merge at the end.
 // ---------------------------------------------------------------------------
 class Builder {
+  root: THREE.Group
+  /** material -> geometries waiting to be merged (one draw call per bucket) */
+  buckets: Map<THREE.Material, THREE.BufferGeometry[]>
+  /** pieces added (reported as `meshes` in the stats) */
+  count: number
+  tris: number
+  _geoCache: Map<string, THREE.BufferGeometry>
+
   constructor() {
     this.root = new THREE.Group();
     this.buckets = new Map(); // material -> [geometry]
@@ -178,28 +246,28 @@ class Builder {
     this._geoCache = new Map();
   }
 
-  _geo(key, make) {
+  _geo(key: string, make: () => THREE.BufferGeometry): THREE.BufferGeometry {
     let g = this._geoCache.get(key);
     if (!g) { g = make(); this._geoCache.set(key, g); }
     return g;
   }
 
-  boxGeo(w, h, d) {
+  boxGeo(w: number, h: number, d: number): THREE.BufferGeometry {
     return this._geo(`b${w}_${h}_${d}`, () => new THREE.BoxGeometry(w, h, d));
   }
-  cylGeo(rt, rb, h, seg = 10, open = false) {
+  cylGeo(rt: number, rb: number, h: number, seg = 10, open = false): THREE.BufferGeometry {
     return this._geo(`c${rt}_${rb}_${h}_${seg}_${open}`, () => new THREE.CylinderGeometry(rt, rb, h, seg, 1, open));
   }
-  planeGeo(w, h, sw = 1, sh = 1) {
+  planeGeo(w: number, h: number, sw = 1, sh = 1): THREE.BufferGeometry {
     return this._geo(`p${w}_${h}_${sw}_${sh}`, () => new THREE.PlaneGeometry(w, h, sw, sh));
   }
-  sphereGeo(r, seg = 12) {
+  sphereGeo(r: number, seg = 12): THREE.BufferGeometry {
     return this._geo(`s${r}_${seg}`, () => new THREE.SphereGeometry(r, seg, Math.max(4, seg >> 1)));
   }
-  torusGeo(r, t, seg = 12, rings = 8) {
+  torusGeo(r: number, t: number, seg = 12, rings = 8): THREE.BufferGeometry {
     return this._geo(`t${r}_${t}_${seg}_${rings}`, () => new THREE.TorusGeometry(r, t, rings, seg));
   }
-  capsuleGeo(r, len, seg = 10) {
+  capsuleGeo(r: number, len: number, seg = 10): THREE.BufferGeometry {
     return this._geo(`k${r}_${len}_${seg}`, () => new THREE.CapsuleGeometry(r, len, 4, seg));
   }
 
@@ -207,7 +275,7 @@ class Builder {
    * Add geometry. opts: { pos, rot, scale, outline, dynamic, parent, name }
    * outline: multiplier for the hull width (0 = no outline).
    */
-  add(geo, mat, opts = {}) {
+  add(geo: THREE.BufferGeometry, mat: THREE.Material, opts: PieceOpts = {}): THREE.Mesh | null {
     const { pos, rot, scale, outline = 1, dynamic = false, parent = null, name = '' } = opts;
     this.count++;
     this.tris += (geo.index ? geo.index.count : geo.attributes.position.count) / 3;
@@ -230,20 +298,20 @@ class Builder {
     return null;
   }
 
-  box(w, h, d, mat, opts) { return this.add(this.boxGeo(w, h, d), mat, opts); }
-  cyl(rt, rb, h, seg, mat, opts) { return this.add(this.cylGeo(rt, rb, h, seg), mat, opts); }
+  box(w: number, h: number, d: number, mat: THREE.Material, opts?: PieceOpts) { return this.add(this.boxGeo(w, h, d), mat, opts); }
+  cyl(rt: number, rb: number, h: number, seg: number, mat: THREE.Material, opts?: PieceOpts) { return this.add(this.cylGeo(rt, rb, h, seg), mat, opts); }
   /** Vertical plane, normal facing +z by default. */
-  plane(w, h, mat, opts) { return this.add(this.planeGeo(w, h), mat, opts); }
+  plane(w: number, h: number, mat: THREE.Material, opts?: PieceOpts) { return this.add(this.planeGeo(w, h), mat, opts); }
   /** Horizontal plane (facing up). */
-  plate(w, d, mat, opts = {}) {
-    const rot = opts.rot ? opts.rot.slice() : [0, 0, 0];
-    const o = { ...opts, rot: [rot[0] - Math.PI / 2, rot[1], rot[2]] };
+  plate(w: number, d: number, mat: THREE.Material, opts: PieceOpts = {}) {
+    const rot: Vec3 = opts.rot ? [...opts.rot] : [0, 0, 0];
+    const o: PieceOpts = { ...opts, rot: [rot[0] - Math.PI / 2, rot[1], rot[2]] };
     return this.add(this.planeGeo(w, d), mat, o);
   }
-  sphere(r, seg, mat, opts) { return this.add(this.sphereGeo(r, seg), mat, opts); }
+  sphere(r: number, seg: number, mat: THREE.Material, opts?: PieceOpts) { return this.add(this.sphereGeo(r, seg), mat, opts); }
 
   /** Merge every static bucket into one mesh per material, then build outline shells. */
-  finalize({ outlineMeshes = true } = {}) {
+  finalize({ outlineMeshes = true }: { outlineMeshes?: boolean } = {}): BuildStats {
     let buckets = 0;
     for (const [mat, geos] of this.buckets) {
       if (!geos.length) continue;
@@ -269,7 +337,7 @@ class Builder {
 }
 
 /** Convenience: build a small static group and return it merged. */
-function mergeGroup(group) {
+function mergeGroup(group: THREE.Group): THREE.Group {
   const out = new THREE.Group();
   return out;
 }
