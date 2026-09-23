@@ -1,159 +1,245 @@
 import { useEffect, useRef } from 'react'
 import { useExperience } from '../state/store'
+import { getDiorama, hasQueryFlag, type DioramaHandle } from './diorama'
+import { interpolateActs, OPENING_POSE } from './keyframes'
 
 /**
- * SceneDriver — bridges the prebuilt diorama bundle (public/diorama.js,
- * exposed on window.__dio) with our scroll narrative.
+ * SceneDriver — bridges the diorama bundle (`/diorama.js`, exposed on
+ * `window.__DIORAMA`) with our two camera modes.
  *
- * Responsibilities:
- *  - wait for the bundle's `window.__dioReady`
- *  - relax its OrbitControls constraints (default minDistance 15 is too
- *    far for the "through the glass" scene)
- *  - drive camera.position + controls.target through 5 keyframes as the
- *    user scrolls (damped, cinematic)
- *  - at the very top (idle) hand control back to the user for free
- *    orbiting; scrolling re-takes control
+ *  narrative mode
+ *    page scroll drives five acts; near the top the camera glides home and
+ *    then hands over to the user (idle orbiting), and scrolling re-takes it.
+ *
+ *  orbit mode ("360°")
+ *    the user owns the camera completely — rotate / zoom / pan. Page scrolling
+ *    is locked so the narrative can't fight the camera, the HTML caption layer
+ *    fades out, and the mouse wheel is released to the controls for zooming
+ *    instead of scrolling.
+ *
+ * Wheel rules matter here: OrbitControls calls preventDefault in its wheel
+ * handler, which would swallow page scrolling. In narrative mode we stop the
+ * event during the capture phase so the page keeps scrolling normally
+ * (⌘/Ctrl+wheel still zooms); in orbit mode the page is locked anyway, so the
+ * wheel goes straight to the controls.
  */
 
-interface Keyframe {
-  pos: [number, number, number]
-  target: [number, number, number]
+/** wide limits while the narrative owns the camera */
+const NARRATIVE = { minDistance: 0.6, maxDistance: 160, minPolar: 0.05, maxPolar: Math.PI * 0.98 }
+/** comfortable limits for the idle free-orbit at the top of the page */
+const FREE = { minDistance: 6, maxDistance: 90, minPolar: 0.1, maxPolar: 1.52 }
+/** 360° exploration: as much room as feels good without losing the model */
+const EXPLORE = { minDistance: 2.5, maxDistance: 120, minPolar: 0.06, maxPolar: 1.6 }
+
+const BOOT_TIMEOUT_MS = 12000
+
+/** module-level guard so React StrictMode's double mount can't double-init */
+let didInit = false
+let didReportReady = false
+
+function applyProfile(dio: DioramaHandle, profile: typeof NARRATIVE): void {
+  const c = dio.controls
+  c.minDistance = profile.minDistance
+  c.maxDistance = profile.maxDistance
+  c.minPolarAngle = profile.minPolar
+  c.maxPolarAngle = profile.maxPolar
 }
 
-/**
- * Scene scale reference (measured from the bundle):
- *   store center ≈ (0.2, 2.9, 0.3), storefront faces +z
- *   whole block spans x[-21, 26], z[-13, 13], towers up to y≈21.6
- *   the bundle clamps its controls.target to x[-8,8], y[-1.2,7], z[-8,8]
- *
- * Keyframes calibrated against the actual scene (see screenshots):
- * every shot was verified in-browser before being locked in.
- */
-const KEYFRAMES: Keyframe[] = [
-  // Scene 01 — Arrival: high wide establishing shot of the whole diorama
-  { pos: [-24.5, 17.5, 28.5], target: [0, 2.2, 0] },
-  // Scene 02 — Storefront: street level, the glowing shopfront straight on
-  { pos: [0.6, 2.2, 14.5], target: [0.2, 2.5, 3.0] },
-  // Scene 03 — Inside: right up against the glass, shelves visible through it
-  { pos: [0.3, 2.05, 11.0], target: [0.2, 2.2, -0.8] },
-  // Scene 04 — Street Corner: around to the vending machines / alley side
-  { pos: [-13.5, 3.6, 6.5], target: [-3.5, 1.9, -0.6] },
-  // Scene 05 — Night: pulled back, lower angle, the glowing box in the dark
-  { pos: [-20.0, 5.2, 25.0], target: [0.4, 2.6, 0] },
-]
-
-const MIN_DISTANCE = 2
-const MAX_DISTANCE = 95
-
-const smooth = (t: number) => t * t * (3 - 2 * t)
+function markBoot(state: string): void {
+  document.documentElement.setAttribute('data-diorama-boot', state)
+}
 
 export default function SceneDriver() {
   const setSceneReady = useExperience((s) => s.setSceneReady)
-  const setQuality = useExperience((s) => s.setQuality)
   const mode = useRef<'scroll' | 'free'>('scroll')
+  const lastTime = useRef(0)
+  const savedScrollY = useRef(0)
+  const lastViewMode = useRef<'narrative' | 'orbit'>('narrative')
 
   useEffect(() => {
-    let raf = 0
-    let disposed = false
-    let initialized = false
-
-    // quality flags (mobile / reduced motion) — also used to cap DPR
     const isMobile =
       /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
       (navigator.maxTouchPoints > 1 && window.innerWidth < 900)
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    setQuality(isMobile, reducedMotion)
+    useExperience.getState().setQuality(isMobile, reducedMotion)
 
-    const init = (dio: any) => {
-      if (initialized) return
-      initialized = true
+    let raf = 0
+    let disposed = false
+    const startedAt = performance.now()
+    let wheelTarget: HTMLCanvasElement | null = null
 
-      // no idle auto-rotation: the narrative owns the camera at rest
+    /**
+     * narrative mode: keep plain wheel for page scrolling by stopping the event
+     * before OrbitControls can preventDefault it (⌘/Ctrl+wheel still zooms).
+     * orbit mode: the page is locked, so the wheel belongs to the controls.
+     */
+    const onWheelCapture = (e: WheelEvent) => {
+      if (e.metaKey || e.ctrlKey) return
+      if (useExperience.getState().viewMode === 'orbit') return
+      e.stopImmediatePropagation()
+    }
+
+    const init = (dio: DioramaHandle) => {
+      if (didInit) return
+      didInit = true
+
       dio.controls.autoRotate = false
-      // the bundle default (15) prevents close-ups through the glass
-      dio.controls.minDistance = MIN_DISTANCE
-      dio.controls.maxDistance = MAX_DISTANCE
       dio.controls.enableDamping = true
       dio.controls.dampingFactor = 0.06
-      dio.controls.rotateSpeed = 0.5
+      dio.controls.rotateSpeed = 0.55
       dio.controls.zoomSpeed = 0.8
-      // start locked: we glide from the bundle's default view to keyframe 0,
-      // then hand control over for free orbiting
+      dio.controls.panSpeed = 0.6
+      applyProfile(dio, NARRATIVE)
+      // start locked: the narrative glides to act 01, then hands over
       dio.controls.enabled = false
 
-      // cap DPR for performance (bundle renders at full devicePixelRatio)
+      // a little more room for the "through the glass" act
+      dio.camera.near = 0.6
+      dio.camera.updateProjectionMatrix()
+
       const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2)
       dio.renderer.setPixelRatio(dpr)
+      if (isMobile) {
+        dio.ground.maxSize = 512
+        // the bundle sets touch-action:none inline; allow vertical page scroll
+        dio.renderer.domElement.style.touchAction = 'pan-y'
+      }
+
+      // reduced motion: calmer rain and barely any rain rings
+      if (reducedMotion) {
+        dio.rain.setAmount(0.35)
+        const rip = dio.ground.uniforms.uRipAmp
+        if (rip) rip.value = 0.25
+      }
+
+      // let the bundle re-run its own resize() (post + reflection target)
+      window.dispatchEvent(new Event('resize'))
+
+      wheelTarget = dio.renderer.domElement
+      wheelTarget.addEventListener('wheel', onWheelCapture, { capture: true, passive: false })
+    }
+
+    /** narrative → 360°: lock the page, fold the captions away, hand over the camera */
+    const enterOrbit = (dio: DioramaHandle) => {
+      savedScrollY.current = window.scrollY
+      document.documentElement.classList.add('is-orbit')
+      applyProfile(dio, EXPLORE)
+      dio.controls.enabled = true
+      dio.renderer.domElement.style.touchAction = 'none'
+      mode.current = 'free'
+      // the viewport just got wider (scrollbar gone) — let the bundle resize
       window.dispatchEvent(new Event('resize'))
     }
 
-    const tick = () => {
-      if (disposed) return
-      const dio = (window as any).__dio
+    /** 360° → narrative: restore the page position and let the acts take over */
+    const exitOrbit = (dio: DioramaHandle) => {
+      document.documentElement.classList.remove('is-orbit')
+      window.scrollTo(0, savedScrollY.current)
+      mode.current = 'scroll'
+      applyProfile(dio, NARRATIVE)
+      dio.controls.enabled = false
+      if (isMobile) dio.renderer.domElement.style.touchAction = 'pan-y'
+      window.dispatchEvent(new Event('resize'))
+    }
 
-      if (!dio || !(window as any).__dioReady) {
+    const tick = (now: number) => {
+      if (disposed) return
+
+      const dio = getDiorama()
+      if (!dio) {
+        if (now - startedAt > BOOT_TIMEOUT_MS) {
+          markBoot('no-diorama')
+          console.error('[diorama] boot timeout — window.__DIORAMA never appeared')
+          return
+        }
         raf = requestAnimationFrame(tick)
         return
       }
-      if (!initialized) {
+
+      if (!didInit) {
+        if (!document.getElementById('scene')) {
+          markBoot('no-canvas')
+          console.error('[diorama] #scene canvas missing (the bundle looks it up by id)')
+          return
+        }
         init(dio)
+        markBoot('init')
+      }
+
+      // honest readiness: we have actually rendered a frame
+      const renderedFrame = dio.renderer.info.render.calls > 0
+      if (!didReportReady && renderedFrame) {
+        didReportReady = true
+        document.documentElement.setAttribute('data-diorama-ready', '1')
         setSceneReady(true)
       }
 
-      const p = useExperience.getState().scrollProgress
-      const cam = dio.camera
-      const controls = dio.controls
-      const dt = 1 / 60
+      const state = useExperience.getState()
+
+      // ---- view mode transitions ----
+      if (state.viewMode !== lastViewMode.current) {
+        if (state.viewMode === 'orbit') enterOrbit(dio)
+        else exitOrbit(dio)
+        lastViewMode.current = state.viewMode
+      }
+
+      // ---- 360°: the user owns the camera, never touch it ----
+      if (state.viewMode === 'orbit') {
+        lastTime.current = now
+        raf = requestAnimationFrame(tick)
+        return
+      }
+
+      // ---- narrative camera ----
+      const dt = lastTime.current ? Math.min((now - lastTime.current) / 1000, 0.1) : 1 / 60
+      lastTime.current = now
       const damping = 1 - Math.exp(-3.0 * dt)
 
-      // ---- scene index interpolation ----
-      const t = Math.min(Math.max(p, 0), 1) * (KEYFRAMES.length - 1)
-      const i = Math.min(Math.floor(t), KEYFRAMES.length - 2)
-      const f = smooth(t - i)
-      const a = KEYFRAMES[i]
-      const b = KEYFRAMES[i + 1]
-      const px = a.pos[0] + (b.pos[0] - a.pos[0]) * f
-      const py = a.pos[1] + (b.pos[1] - a.pos[1]) * f
-      const pz = a.pos[2] + (b.pos[2] - a.pos[2]) * f
-      const tx = a.target[0] + (b.target[0] - a.target[0]) * f
-      const ty = a.target[1] + (b.target[1] - a.target[1]) * f
-      const tz = a.target[2] + (b.target[2] - a.target[2]) * f
+      const progress = state.scrollProgress
+      const cam = dio.camera
+      const controls = dio.controls
 
-      if (p < 0.02) {
-        // Top of the page: glide back to the opening frame, then hand
-        // the camera to the user for free orbiting.
+      if (progress < 0.02) {
+        // idle at the top: glide home, then give the camera to the user
         if (mode.current === 'scroll') {
-          const home = KEYFRAMES[0]
-          cam.position.lerp({ x: home.pos[0], y: home.pos[1], z: home.pos[2] } as any, damping * 0.6)
-          controls.target.lerp({ x: home.target[0], y: home.target[1], z: home.target[2] } as any, damping)
-          const dx = cam.position.x - home.pos[0]
-          const dy = cam.position.y - home.pos[1]
-          const dz = cam.position.z - home.pos[2]
+          cam.position.lerp(OPENING_POSE.pos, damping * 0.6)
+          controls.target.lerp(OPENING_POSE.target, damping)
+          const dx = cam.position.x - OPENING_POSE.pos.x
+          const dy = cam.position.y - OPENING_POSE.pos.y
+          const dz = cam.position.z - OPENING_POSE.pos.z
           if (Math.sqrt(dx * dx + dy * dy + dz * dz) < 0.6) {
             mode.current = 'free'
+            applyProfile(dio, FREE)
             controls.enabled = true
           }
         }
-        // in 'free' mode we leave the camera alone entirely
+        // in 'free' mode we leave the camera completely alone
       } else {
-        // Scrolling: narrative owns the camera.
         if (mode.current === 'free') {
           mode.current = 'scroll'
           controls.enabled = false
+          applyProfile(dio, NARRATIVE)
         }
-        cam.position.lerp({ x: px, y: py, z: pz } as any, damping)
-        controls.target.lerp({ x: tx, y: ty, z: tz } as any, damping)
+        const pose = interpolateActs(progress)
+        cam.position.lerp(pose.pos, damping)
+        controls.target.lerp(pose.target, damping)
       }
 
       raf = requestAnimationFrame(tick)
     }
 
     raf = requestAnimationFrame(tick)
+
     return () => {
       disposed = true
       cancelAnimationFrame(raf)
+      if (wheelTarget) wheelTarget.removeEventListener('wheel', onWheelCapture, { capture: true })
+      document.documentElement.classList.remove('is-orbit')
     }
-  }, [setSceneReady, setQuality])
+  }, [setSceneReady])
 
   return null
 }
+
+/** small helper kept for parity with the previous driver */
+export const __isSkipIntro = () => hasQueryFlag('skipintro')

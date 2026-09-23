@@ -45,3 +45,7 @@ debug.log
 /.sessions
 /.usage
 # /.memory
+
+# vite config temp artifacts
+vite.config.*.timestamp-*.mjs
+/dist

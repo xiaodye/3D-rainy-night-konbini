@@ -18,8 +18,12 @@ body {
   overscroll-behavior: none;
 }
 
+/* #root spans the whole 500vh narrative flow, so it must NOT swallow pointer
+   input — otherwise the WebGL canvas underneath never receives a single event
+   and orbiting/zooming is completely dead. Interactive children opt back in. */
 #root {
   position: relative;
+  pointer-events: none;
 }
 
 ::selection {
@@ -27,7 +31,8 @@ body {
 }
 
 /* ---------- WebGL diorama canvas (built by public/diorama.js) ---------- */
-#c {
+/* id must stay `scene` — the bundle looks it up by that name */
+#scene {
   position: fixed;
   inset: 0;
   width: 100%;
@@ -39,11 +44,18 @@ body {
   outline: none;
 }
 
-#c:active {
+#scene:active {
   cursor: grabbing;
 }
 
-/* cinematic vignette above the canvas, below the narrative */
+/* the bundle's own panel DOM is used as a hidden parameter source only */
+#demo-ui {
+  display: none;
+}
+
+/* cinematic vignette above the canvas, below the narrative.
+   Kept light: the bundle's own composite pass already adds vignette + grain,
+   so this is only a whisper of extra falloff. */
 #vig {
   position: fixed;
   inset: 0;
@@ -51,9 +63,9 @@ body {
   pointer-events: none;
   background: radial-gradient(
     125% 105% at 50% 46%,
-    rgba(0, 0, 0, 0) 40%,
-    rgba(3, 5, 10, 0.26) 70%,
-    rgba(2, 3, 7, 0.64) 100%
+    rgba(0, 0, 0, 0) 42%,
+    rgba(3, 5, 10, 0.13) 72%,
+    rgba(2, 3, 7, 0.32) 100%
   );
 }
 
@@ -113,6 +125,20 @@ body {
   position: relative;
   z-index: 2;
   pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+
+/* ---------- 360° mode: page locked, captions folded away ---------- */
+html.is-orbit {
+  overflow: hidden;
+}
+
+html.is-orbit .narrative {
+  opacity: 0;
+}
+
+html.is-orbit .scroll-hint {
+  opacity: 0 !important;
 }
 
 .narrative-scene {
@@ -238,5 +264,292 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .scroll-hint .hint-line {
     animation: none;
+  }
+}
+
+/* ---------- Water tuning panel ---------- */
+/* deliberately quiet: film-caption typography, hairline rules, no glass glow */
+.water-ui {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 20;
+  pointer-events: auto;
+  font-size: 11px;
+}
+
+.water-tab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0 2px 11px;
+  background: none;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.42);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  cursor: pointer;
+  transition: color 0.5s ease, border-color 0.5s ease;
+}
+
+.water-tab:hover {
+  color: rgba(255, 255, 255, 0.78);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.water-tab-key {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 1px 4px;
+}
+
+.water-ui.is-muted .water-tab {
+  opacity: 0.45;
+}
+
+.water-panel {
+  width: 238px;
+  padding: 12px 14px 10px;
+  background: rgba(7, 10, 17, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.water-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.water-title {
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.water-close {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.4s ease;
+}
+
+.water-close:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.water-rule {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 10px 0;
+}
+
+.water-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.water-row {
+  display: grid;
+  grid-template-columns: 58px 1fr 34px;
+  align-items: center;
+  gap: 8px;
+}
+
+.water-row label {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.water-row output {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* hairline sliders (no glow, unlike the upstream demo) */
+.water-row input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.water-row input[type='range']::-webkit-slider-runnable-track {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.water-row input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 9px;
+  height: 9px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.water-row input[type='range']::-moz-range-track {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.water-row input[type='range']::-moz-range-thumb {
+  width: 9px;
+  height: 9px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.water-row input[type='range']:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 4px;
+}
+
+.water-reset {
+  background: none;
+  border: none;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.38);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  cursor: pointer;
+  transition: color 0.4s ease;
+}
+
+.water-reset:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.water-hint {
+  margin-top: 8px;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.22);
+}
+
+/* mobile: dock to the bottom as a drawer */
+@media (max-width: 720px), (pointer: coarse) {
+  .water-ui {
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+
+  .water-panel {
+    width: auto;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding: 14px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .water-row {
+    grid-template-columns: 62px 1fr 36px;
+    gap: 10px;
+    min-height: 44px;
+  }
+
+  .water-tab {
+    margin-left: 18px;
+    margin-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .water-hint {
+    display: none;
+  }
+}
+
+/* ---------- View mode switch (top-right) ---------- */
+.view-switch {
+  position: fixed;
+  right: 18px;
+  top: 18px;
+  z-index: 20;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.view-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.view-switch button {
+  background: none;
+  border: none;
+  padding: 2px 0;
+  color: rgba(255, 255, 255, 0.3);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  cursor: pointer;
+  transition: color 0.45s ease;
+}
+
+.view-switch button:hover {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.view-switch button.is-on {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.vs-sep {
+  width: 1px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.vs-key {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 1px 4px;
+}
+
+.view-hint {
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.22);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .view-switch {
+    top: 14px;
+    right: 14px;
+  }
+
+  /* touch copy: no wheel or right-drag on a phone */
+  .view-hint {
+    max-width: 40vw;
+    white-space: normal;
+    text-align: right;
   }
 }
