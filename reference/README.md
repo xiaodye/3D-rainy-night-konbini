@@ -37,6 +37,12 @@
 - demo 的 `controls` 每帧 `update()` 都会用球坐标**回写 `camera.position`**，并 clamp 到 `minDistance/maxDistance` 与 `min/maxPolarAngle`。所以驱动相机前必须放宽这些约束（`SceneDriver` 里的 `NARRATIVE` profile）。
 - demo 自带 composite 阶段的暗角与颗粒，我们自己的 `#vig` 只是很轻的一层叠加。
 
+## 相关文档
+
+- **性能**：这个 bundle 的默认配置（4× MSAA、每帧全屏平面反射、每帧重算阴影）在 fill-rate 受限的 GPU 上会很吃力。
+  诊断过程、优化动作与量化收益见 [`../docs/performance-report.md`](../docs/performance-report.md)。
+  改动集中在 `index.html` 的 `?msaa=2` 注入与 `src/scene/SceneDriver.tsx` 的初始化部分，**不修改 bundle 本身**。
+
 ## 升级到新版 demo 的 checklist
 1. 把新 HTML 放到 `reference/`，用 `grep -n '<script' / '</script>'` 重新确定四个区间边界。
 2. 确认新版的 `window.__DIORAMA` 仍是 IIFE 末句、canvas id 仍是 `scene`、自带面板段仍会 `getElementById('hide')`。

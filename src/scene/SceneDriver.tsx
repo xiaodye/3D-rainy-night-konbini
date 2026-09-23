@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { useExperience } from '../state/store'
-import { getDiorama, hasQueryFlag, type DioramaHandle } from './diorama'
+import {
+  applyQualityPreset,
+  getDiorama,
+  hasQueryFlag,
+  type DioramaHandle,
+} from './diorama'
 import { interpolateActs, OPENING_POSE } from './keyframes'
 
 /**
@@ -55,6 +60,7 @@ export default function SceneDriver() {
   const lastTime = useRef(0)
   const savedScrollY = useRef(0)
   const lastViewMode = useRef<'narrative' | 'orbit'>('narrative')
+  const lastQuality = useRef(useExperience.getState().qualityPreset)
 
   useEffect(() => {
     const isMobile =
@@ -97,10 +103,18 @@ export default function SceneDriver() {
       dio.camera.near = 0.6
       dio.camera.updateProjectionMatrix()
 
-      const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2)
-      dio.renderer.setPixelRatio(dpr)
+      /*
+       * Shadows are baked once instead of every frame. Nothing in the scene
+       * needs a live shadow update (the sliding doors are glass and barely
+       * cast), and re-rendering the 2048² shadow map each frame is a real cost
+       * — the reference build we're replacing did exactly this.
+       */
+      dio.renderer.shadowMap.autoUpdate = false
+      dio.renderer.shadowMap.needsUpdate = true
+
+      // quality preset (resolution + reflection target size)
+      applyQualityPreset(dio, useExperience.getState().qualityPreset, isMobile)
       if (isMobile) {
-        dio.ground.maxSize = 512
         // the bundle sets touch-action:none inline; allow vertical page scroll
         dio.renderer.domElement.style.touchAction = 'pan-y'
       }
@@ -111,9 +125,6 @@ export default function SceneDriver() {
         const rip = dio.ground.uniforms.uRipAmp
         if (rip) rip.value = 0.25
       }
-
-      // let the bundle re-run its own resize() (post + reflection target)
-      window.dispatchEvent(new Event('resize'))
 
       wheelTarget = dio.renderer.domElement
       wheelTarget.addEventListener('wheel', onWheelCapture, { capture: true, passive: false })
@@ -175,6 +186,12 @@ export default function SceneDriver() {
       }
 
       const state = useExperience.getState()
+
+      // ---- quality preset changes (driven by the water panel) ----
+      if (state.qualityPreset !== lastQuality.current) {
+        lastQuality.current = state.qualityPreset
+        applyQualityPreset(dio, state.qualityPreset, isMobile)
+      }
 
       // ---- view mode transitions ----
       if (state.viewMode !== lastViewMode.current) {

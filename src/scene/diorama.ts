@@ -46,6 +46,7 @@ export interface DioramaHandle {
     info: { render: { calls: number; frame: number } }
     setPixelRatio(v: number): void
     domElement: HTMLCanvasElement
+    shadowMap: { autoUpdate: boolean; needsUpdate: boolean; type: number }
   }
   post: {
     composite: { material: { uniforms: Record<string, { value: number }> } }
@@ -151,6 +152,64 @@ export function readWaterParams(dio: DioramaHandle | null): Record<WaterKey, num
     out[spec.key] = value ?? spec.default
   }
   return out
+}
+
+/* ------------------------------------------------------------------ */
+/* Quality presets                                                     */
+/* ------------------------------------------------------------------ */
+
+export type QualityPreset = 'smooth' | 'balanced' | 'sharp'
+
+export interface QualitySpec {
+  key: QualityPreset
+  label: string
+  /** device pixel ratio cap */
+  dpr: number
+  /** planar-reflection render target cap (px, square) */
+  reflect: number
+}
+
+/**
+ * The diorama is fill-rate bound: it draws the scene twice (a full planar
+ * reflection pass on top of the main pass), then runs a bloom composite, all at
+ * full device resolution. On fill-rate limited GPUs (Apple silicon laptops in
+ * particular) the pixel count is what decides the frame rate — so these three
+ * presets mostly trade resolution, and the reflection target size, for speed.
+ */
+export const QUALITY_PRESETS: QualitySpec[] = [
+  { key: 'smooth', label: '流畅', dpr: 1.25, reflect: 384 },
+  { key: 'balanced', label: '均衡', dpr: 1.75, reflect: 640 },
+  { key: 'sharp', label: '清晰', dpr: 2, reflect: 896 },
+]
+
+export function getQualitySpec(preset: QualityPreset): QualitySpec {
+  return QUALITY_PRESETS.find((p) => p.key === preset) ?? QUALITY_PRESETS[1]
+}
+
+/** absolute ceilings so a phone never tries to render a 2× 896² reflection */
+const QUALITY_CAP = {
+  desktop: { dpr: 2, reflect: 896 },
+  mobile: { dpr: 1.5, reflect: 512 },
+}
+
+/**
+ * Apply a quality preset to the running scene.
+ * Safe to call repeatedly (preset switches dispatch a resize, which the bundle
+ * handles by resizing the post targets and the reflection target).
+ */
+export function applyQualityPreset(
+  dio: DioramaHandle | null,
+  preset: QualityPreset,
+  isMobile: boolean,
+): void {
+  if (!dio) return
+  const spec = getQualitySpec(preset)
+  const cap = isMobile ? QUALITY_CAP.mobile : QUALITY_CAP.desktop
+  const dpr = Math.min(window.devicePixelRatio || 1, spec.dpr, cap.dpr)
+
+  dio.renderer.setPixelRatio(dpr)
+  dio.ground.maxSize = Math.min(spec.reflect, cap.reflect)
+  window.dispatchEvent(new Event('resize'))
 }
 
 /* ------------------------------------------------------------------ */

@@ -553,3 +553,50 @@ html.is-orbit .scroll-hint {
     text-align: right;
   }
 }
+
+/* quality preset row inside the water panel */
+.water-quality {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.water-quality-label {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.water-quality-opts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.water-quality-opts button {
+  background: none;
+  border: none;
+  padding: 1px 0;
+  color: rgba(255, 255, 255, 0.3);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition: color 0.4s ease;
+}
+
+.water-quality-opts button:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.water-quality-opts button.is-on {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.water-quality-note {
+  margin-top: 6px;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.2);
+}
