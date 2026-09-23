@@ -5,4 +5,4 @@ Allow: /
 # the 3D bundle is large and carries no indexable content
 Disallow: /assets/
 
-Sitemap: https://your-domain.example/sitemap.xml
+Sitemap: https://rainy-night-konbini.vercel.app/sitemap.xml
