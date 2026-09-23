@@ -96,40 +96,30 @@ _一座 26×26 米的微缩街角：SUNMART 便利店、两栋邻居楼、雨、
 
 ## 🧱 技术架构
 
-```text
-┌─────────────── React 18 · UI 层 ───────────────┐        ┌────────── three.js r169 · 场景层 ──────────┐
-│                                                │        │                                           │
-│  ScrollNarrative   滚动进度 ──► 五幕字幕        │ scroll │  config      布局常量 / 调色板 / 种子随机    │
-│  ViewSwitch        视角模式 ◄─┐                │────────│  toon        toon 材质 + Builder 几何合并   │
-│  WaterPanel ───────┼──────────┤ uniform 写入   │        │  ground      湿地面着色器 + 平面镜反射      │
-│  LoadingScreen     │          │                │        │  rain        雨 / 溅落 / 檐下滴水           │
-│  SceneDriver ──────┘          └───► bootDiorama │        │  postfx      HDR ─► bloom ─► 电影级合成     │
-│   ▸ 相机五幕插值 + 阻尼         （幂等装配）     │        │  props      街道道具 / 邻居楼 / 贩卖机      │
-│   ▸ 360° 自由环绕（切档）                        │        │  store      便利店 / 自动门 / 招牌闪烁      │
-└────────────────────────────────────────────────┘        └───────────────────────────────────────────┘
-         zustand（滚动进度 / 视角模式 / 水面参数）                          window.__DIORAMA 调试句柄
-```
+<div align="center">
+<img src="docs/architecture.png" alt="架构图：React UI 层 — 桥接层（bootDiorama / SceneDriver / WaterPanel）— three.js 场景层" width="920">
+</div>
 
-- **UI 层**（React）：叙事字幕、视角切换、调参面板、Loading —— 只做排版与状态
-- **场景层**（原生 three.js，9 个模块约 3,600 行）：全部渲染逻辑，经 `bootDiorama()` 装配，
-  通过 `window.__DIORAMA` 暴露调试句柄
-- **桥接**：`SceneDriver` 每帧把滚动进度翻译成相机位姿；`WaterPanel` 把滑块写进 uniform
+- **UI 层**（React 18）：叙事字幕、视角切换、调参面板、Loading —— 只做排版与状态
+- **场景层**（原生 three.js r169，9 个模块约 3,600 行）：全部渲染逻辑，经 `bootDiorama()` 装配，通过 `window.__DIORAMA` 暴露调试句柄
+- **桥接**：`SceneDriver` 每帧把滚动进度翻译成相机位姿；`WaterPanel` 把滑块写进 uniform；`zustand` 承载滚动进度 / 视角模式 / 水面参数
+
 
 ## 🚀 快速开始
 
 ```bash
 git clone https://github.com/xiaodye/rainy-night-konbini
 cd rainy-night-konbini
-npm install
-npm run dev        # 开发服务器（首次预构建约 20s，属正常）
+pnpm install
+pnpm dev           # 开发服务器（首次预构建约 20s，属正常）
 ```
 
 ```bash
-npm run build      # 生产构建（~944 KB / gzip 260 KB）
-npm run preview    # 本地预览构建产物
+pnpm build         # 生产构建（~944 KB / gzip 260 KB）
+pnpm preview       # 本地预览构建产物
 ```
 
-> 性能对比请用构建产物（`npm run dev` 有 HMR 与未压缩代码的开销）。
+> 性能对比请用构建产物（`pnpm dev` 有 HMR 与未压缩代码的开销）。
 
 ## 🔧 调试参数
 
