@@ -12,6 +12,7 @@ import * as THREE from 'three'
 
 import { BASE, STREET, WALK, COLORS, makeRng } from './config'
 import { toon, Builder } from './toon'
+import type { Vec3 } from './toon'
 
 // ---------------------------------------------------------------------------
 // The base plate + the wet street surface.
@@ -492,13 +493,33 @@ const GROUND_FS = /* glsl */`
     col += uSky * wet * (0.16 + 0.30 * fres) * (1.0 - 0.75 * uWaterDark);
 
     // light pools on the pavement
+    // Up to eight pools overlap around the shopfront. Summing them linearly
+    // blows straight past white (one lamp already contributes ~1 close up), so
+    // accumulate a weighted colour plus the total weight instead, then push the
+    // brightness through a saturating curve. Light adds, but it never exceeds
+    // white — and the panel slider stays usable across its whole range.
+    vec3 poolCol = vec3(0.0);
+    float poolW = 0.0;
     for (int i = 0; i < 8; i++) {
       if (i >= uLightCount) break;
       vec3 d = uLightPos[i] - vWorld;
       float dist2 = dot(d, d);
       float r = uLightRad[i].x;
+      // squared falloff: full strength directly under the lamp, quickly gone
+      // beyond it. The radii are authored generously, so without this the eight
+      // pools overlap into one uniform wash instead of reading as light pools.
       float att = 1.0 / (1.0 + dist2 / (r * r));
-      col += uLightCol[i] * att * uLightRad[i].y * uPoolStrength * mix(0.55, 1.0, wet);
+      att *= att;
+      float w = att * uLightRad[i].y;
+      poolCol += uLightCol[i] * w;
+      poolW += w;
+    }
+    if (poolW > 0.0) {
+      // normalised tint keeps the warm/cool mix from being amplified by overlap
+      vec3 poolTint = poolCol / poolW;
+      float lum = poolW * uPoolStrength;
+      lum = lum / (1.0 + lum);            // soft saturation: 0→0, 1→0.5, ∞→1
+      col += poolTint * lum * mix(0.55, 1.0, wet);
     }
 
     // wave crests catch the light
@@ -586,7 +607,10 @@ class WetGround extends THREE.Mesh {
       uReflStrength: { value: 0.85 },
       uWaterDark: { value: 0.55 },
       uSparkle: { value: 0.02 },
-      uPoolStrength: { value: 1.2 },
+      // Deliberately small: this is a gain on the summed pools, so even 0.25
+      // washes the wet asphalt out. ~0.06 keeps the street dark and puts a
+      // faint warm pool at the shopfront; the panel goes up to 0.5.
+      uPoolStrength: { value: 0.06 },
       uDebugRefl: { value: 0 },
       uLightPos: { value: Array.from({ length: 8 }, () => new THREE.Vector3()) },
       uLightCol: { value: Array.from({ length: 8 }, () => new THREE.Color(0, 0, 0)) },
@@ -649,18 +673,19 @@ class WetGround extends THREE.Mesh {
   /**
    * Register a ground light for the reflection/pool shading (max 8).
    *
-   * NOTE: callers pass `[r, g, b]` arrays, but `THREE.Color.set()` only accepts
-   * Color | number | string — an array argument is silently ignored, so the
-   * light colour currently stays black. Behaviour left untouched on purpose
-   * (fixing it changes how the wet ground reads); flagged in
-   * docs/source-restore.md.
+   * Callers pass `[r, g, b]` arrays, but `THREE.Color.set()` only understands
+   * Color | number | string — an array is silently ignored, which left every
+   * pool black. Arrays are routed through `setRGB()` here, so the call sites
+   * stay untouched. Values are linear working-space (`setRGB`'s default).
    */
-  addLight(pos: number[], color: number[] | number | string, radius: number, intensity: number): void {
+  addLight(pos: number[], color: Vec3 | number | string, radius: number, intensity: number): void {
     const i = this._lights++;
     if (i >= 8) return;
     this.uniforms.uLightPos.value[i].set(pos[0], pos[1], pos[2]);
-    // cast keeps the upstream behaviour: Color.set() ignores array arguments
-    this.uniforms.uLightCol.value[i].set(color as THREE.ColorRepresentation);
+
+    const tint = this.uniforms.uLightCol.value[i];
+    if (Array.isArray(color)) tint.setRGB(color[0], color[1], color[2]);
+    else tint.set(color as THREE.ColorRepresentation);
     this.uniforms.uLightRad.value[i].set(radius, intensity);
     this.uniforms.uLightCount.value = this._lights;
   }

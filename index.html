@@ -1,25 +1,109 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!--
+      NOTE: replace `https://rainy-night-konbini.vercel.app` with the real deployment origin
+      before going live — canonical / og:url / og:image must be absolute URLs for
+      crawlers and social platforms to resolve them.
+    -->
+    <title>雨夜便利店街角 · Rainy Night Convenience Store — 交互式 3D 微缩景观</title>
+    <meta
+      name="description"
+      content="一个可以自由走动的雨夜 3D 微缩街角：24 小时亮着的便利店、镜面反射的湿地面、细雨与涟漪。WebGL 实时渲染，滚动五幕叙事，也可切到 360° 自由查看。"
+    />
     <meta name="theme-color" content="#05070d" />
-    <meta name="description" content="A quiet corner, somewhere in Tokyo. An interactive rainy night diorama." />
-    <title>Rainy Night Convenience Store</title>
+    <meta name="color-scheme" content="dark" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <link rel="canonical" href="https://rainy-night-konbini.vercel.app" />
+
+    <!-- icons -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icon-16.png" sizes="16x16" type="image/png" />
+    <link rel="icon" href="/icon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- open graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Rainy Night Convenience Store" />
+    <meta property="og:title" content="雨夜便利店街角 · 交互式 3D 微缩景观" />
+    <meta
+      property="og:description"
+      content="24 小时亮着的便利店、镜面反射的湿地面、细雨与涟漪。一个可以滚动浏览、也可以自由走动的雨夜街角。"
+    />
+    <meta property="og:image" content="https://rainy-night-konbini.vercel.app/og-cover.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="雨夜中的微缩街角：一间亮着灯的便利店，湿漉漉的路面反射着灯光与霓虹" />
+    <meta property="og:url" content="https://rainy-night-konbini.vercel.app" />
+    <meta property="og:locale" content="zh_CN" />
+
+    <!-- twitter / x -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="雨夜便利店街角 · 交互式 3D 微缩景观" />
+    <meta
+      name="twitter:description"
+      content="24 小时亮着的便利店、镜面反射的湿地面、细雨与涟漪。WebGL 实时渲染的雨夜街角。"
+    />
+    <meta name="twitter:image" content="https://rainy-night-konbini.vercel.app/og-cover.jpg" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Noto+Sans+JP:wght@400;500&display=swap"
       rel="stylesheet"
     />
+
+    <!-- structured data: this page is a single interactive artwork -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "CreativeWork",
+        "name": "Rainy Night Convenience Store",
+        "alternateName": "雨夜便利店街角",
+        "description": "An interactive 3D diorama of a small convenience store on a rainy night, somewhere in Tokyo. Real-time WebGL rendering with a scroll-driven five-act narrative and a free 360° camera.",
+        "url": "https://rainy-night-konbini.vercel.app",
+        "image": "https://rainy-night-konbini.vercel.app/og-cover.jpg",
+        "inLanguage": "zh-CN",
+        "genre": "Interactive 3D Diorama",
+        "artMedium": "WebGL",
+        "keywords": "3D, WebGL, diorama, rainy night, convenience store, interactive, 微缩景观, 雨夜",
+        "isFamilyFriendly": true,
+        "datePublished": "2026-09-23"
+      }
+    </script>
   </head>
   <body>
+    <!-- the page's real heading; visually hidden, but it gives crawlers and
+         assistive tech the subject of a canvas-only page -->
+    <h1 class="sr-only">雨夜便利店街角 — Rainy Night Convenience Store</h1>
+
     <!-- 3D diorama surface; the scene (src/scene/diorama) looks it up by this id -->
-    <canvas id="scene"></canvas>
+    <canvas
+      id="scene"
+      role="img"
+      aria-label="雨夜街角的 3D 微缩景观：一间亮着灯的便利店，湿地面反射着灯光与霓虹"
+    ></canvas>
     <div id="vig"></div>
 
     <!-- HTML narrative / loading / water panel layer -->
     <div id="root"></div>
+
+    <noscript>
+      <div class="noscript-note">
+        <h2>雨夜便利店街角</h2>
+        <p>
+          这是一件用 WebGL 实时渲染的交互式 3D 微缩作品：24 小时营业的便利店、被雨水打湿而镜面反射的路面、
+          细雨与地面涟漪。滚动页面依次经过五幕镜头，也可以切换到 360° 模式自由旋转、缩放查看整个街角。
+        </p>
+        <p>请启用 JavaScript 以进入场景。</p>
+      </div>
+    </noscript>
 
     <script type="module" src="/src/main.tsx"></script>
   </body>
