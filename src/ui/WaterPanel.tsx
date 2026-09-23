@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { ambience } from "../audio/ambience";
 import { useExperience } from '../state/store'
 import {
   QUALITY_PRESETS,
@@ -92,7 +93,8 @@ export default function WaterPanel() {
   }, [])
 
   const handleChange = useCallback((key: WaterKey, value: number) => {
-    applyWaterParam(getDiorama(), key, value)
+    applyWaterParam(getDiorama(), key, value);
+    if (key === "rain") ambience.setRainAmount(value);
     setValues((prev) => {
       if (!prev) return prev
       const next = { ...prev, [key]: value }

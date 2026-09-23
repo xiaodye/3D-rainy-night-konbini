@@ -761,3 +761,57 @@ html.is-orbit .scroll-hint {
     transform: rotate(360deg);
   }
 }
+
+/* ambience toggle — glows warm while the night sounds are playing */
+.music-link {
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.3);
+  transition: color 0.45s ease;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+}
+
+.music-link svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.music-link:hover {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.music-link.is-on {
+  color: rgba(255, 207, 133, 0.85);
+}
+
+/* ambience toggle — glows warm while the night sounds are playing */
+.music-link {
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.3);
+  transition: color 0.45s ease;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+}
+
+.music-link svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.music-link:hover {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.music-link.is-on {
+  color: rgba(255, 207, 133, 0.85);
+}

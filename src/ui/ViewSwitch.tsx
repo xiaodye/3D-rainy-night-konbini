@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { useExperience } from "../state/store";
 import { bootDiorama } from "../scene/diorama";
+import { ambience } from "../audio/ambience";
 
 /**
  * 视角模式切换 — top-right segmented switch between:
  *   「叙事」 the scroll-driven five acts
  *   「360°」 free exploration: drag to rotate, wheel to zoom, right-drag to pan
  *
- * Also hosts the GLB export button (⤓) and the GitHub repo link.
+ * Also hosts the ambience toggle (♪), the GLB export button (⤓) and the
+ * GitHub repo link.
  *
  * Keyboard: V toggles, Esc leaves 360° (unless the water panel is open, in
  * which case Esc closes that first — it registers its own handler).
@@ -17,6 +19,18 @@ export default function ViewSwitch() {
   const viewMode = useExperience((s) => s.viewMode);
   const setViewMode = useExperience((s) => s.setViewMode);
   const [exporting, setExporting] = useState(false);
+  const [musicOn, setMusicOn] = useState(false);
+
+  const onToggleMusic = async () => {
+    if (ambience.isRunning) {
+      ambience.stop();
+      setMusicOn(false);
+    } else {
+      await ambience.start();
+      ambience.setRainAmount(1);
+      setMusicOn(true);
+    }
+  };
 
   const onExport = async () => {
     // idempotent: returns the cached handle once the scene is booted
@@ -32,6 +46,22 @@ export default function ViewSwitch() {
       setExporting(false);
     }
   };
+
+  useEffect(() => {
+    // ambience auto-starts on the first user gesture (autoplay policy needs one);
+    // the button state follows the engine so an auto-start lights it up too
+    const sync = () => setMusicOn(ambience.isRunning);
+    const onGesture = () => ambience.autoStartOnGesture();
+    sync();
+    const off = ambience.onChange(sync);
+    window.addEventListener("pointerdown", onGesture);
+    window.addEventListener("keydown", onGesture);
+    return () => {
+      off();
+      window.removeEventListener("pointerdown", onGesture);
+      window.removeEventListener("keydown", onGesture);
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -74,6 +104,30 @@ export default function ViewSwitch() {
         <span className="vs-key" aria-hidden="true">
           V
         </span>
+        <span className="vs-sep" aria-hidden="true" />
+        <button
+          type="button"
+          className={`music-link${musicOn ? " is-on" : ""}`}
+          onClick={onToggleMusic}
+          aria-label={musicOn ? "关闭环境音" : "开启环境音"}
+          title={musicOn ? "关闭环境音" : "开启环境音"}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M9 18V5l12-2v13" />
+            <circle cx="6" cy="18" r="3" />
+            <circle cx="18" cy="16" r="3" />
+          </svg>
+        </button>
         <span className="vs-sep" aria-hidden="true" />
         <button
           type="button"
