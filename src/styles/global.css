@@ -12,7 +12,7 @@ html,
 body {
   background: #04060c;
   color: rgba(255, 255, 255, 0.7);
-  font-family: 'Inter', 'Noto Sans JP', 'Helvetica Neue', sans-serif;
+  font-family: "Inter", "Noto Sans JP", "Helvetica Neue", sans-serif;
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
@@ -174,7 +174,7 @@ html.is-orbit .scroll-hint {
 }
 
 .nb-jp {
-  font-family: 'Noto Sans JP', sans-serif;
+  font-family: "Noto Sans JP", sans-serif;
   font-size: 12px;
   letter-spacing: 0.28em;
   color: rgba(255, 255, 255, 0.4);
@@ -211,7 +211,9 @@ html.is-orbit .scroll-hint {
   text-indent: 0.3em;
   padding: 11px 30px;
   cursor: pointer;
-  transition: border-color 0.5s ease, color 0.5s ease;
+  transition:
+    border-color 0.5s ease,
+    color 0.5s ease;
 }
 
 .explore-again:hover {
@@ -272,7 +274,7 @@ html.is-orbit .scroll-hint {
 .water-ui {
   position: fixed;
   right: 18px;
-  top: 54px;              /* stacked under the view-mode switch */
+  top: 60px; /* stacked under the view-mode switch */
   z-index: 20;
   pointer-events: auto;
   font-size: 11px;
@@ -295,7 +297,9 @@ html.is-orbit .scroll-hint {
   font-size: 11px;
   letter-spacing: 0.3em;
   cursor: pointer;
-  transition: color 0.5s ease, border-color 0.5s ease;
+  transition:
+    color 0.5s ease,
+    border-color 0.5s ease;
 }
 
 .water-tab:hover {
@@ -385,7 +389,7 @@ html.is-orbit .scroll-hint {
 }
 
 /* hairline sliders (no glow, unlike the upstream demo) */
-.water-row input[type='range'] {
+.water-row input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
@@ -394,12 +398,12 @@ html.is-orbit .scroll-hint {
   cursor: pointer;
 }
 
-.water-row input[type='range']::-webkit-slider-runnable-track {
+.water-row input[type="range"]::-webkit-slider-runnable-track {
   height: 1px;
   background: rgba(255, 255, 255, 0.16);
 }
 
-.water-row input[type='range']::-webkit-slider-thumb {
+.water-row input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 9px;
@@ -409,12 +413,12 @@ html.is-orbit .scroll-hint {
   background: rgba(255, 255, 255, 0.85);
 }
 
-.water-row input[type='range']::-moz-range-track {
+.water-row input[type="range"]::-moz-range-track {
   height: 1px;
   background: rgba(255, 255, 255, 0.16);
 }
 
-.water-row input[type='range']::-moz-range-thumb {
+.water-row input[type="range"]::-moz-range-thumb {
   width: 9px;
   height: 9px;
   border: none;
@@ -422,7 +426,7 @@ html.is-orbit .scroll-hint {
   background: rgba(255, 255, 255, 0.85);
 }
 
-.water-row input[type='range']:focus-visible {
+.water-row input[type="range"]:focus-visible {
   outline: 1px solid rgba(255, 255, 255, 0.4);
   outline-offset: 4px;
 }
@@ -493,7 +497,7 @@ html.is-orbit .scroll-hint {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
+  gap: 4px;
   font-size: 11px;
 }
 
@@ -683,7 +687,9 @@ html.is-orbit .scroll-hint {
   display: flex;
   align-items: center;
   color: rgba(255, 255, 255, 0.3);
-  transition: color 0.45s ease, transform 0.45s ease;
+  transition:
+    color 0.45s ease,
+    transform 0.45s ease;
 }
 
 .gh-link svg {
@@ -702,7 +708,9 @@ html.is-orbit .scroll-hint {
   display: flex;
   align-items: center;
   color: rgba(255, 255, 255, 0.3);
-  transition: color 0.45s ease, transform 0.45s ease;
+  transition:
+    color 0.45s ease,
+    transform 0.45s ease;
 }
 
 .gh-link svg {
@@ -714,4 +722,42 @@ html.is-orbit .scroll-hint {
 .gh-link:hover {
   color: rgba(255, 255, 255, 0.78);
   transform: translateY(-1px);
+}
+
+/* GLB export button, next to the GitHub link in the view-mode row */
+.export-link {
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.3);
+  transition: color 0.45s ease;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+}
+
+.export-link svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.export-link:hover {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* while the exporter works the icon spins and the button ignores clicks */
+.export-link.exporting svg {
+  animation: export-spin 1s linear infinite;
+}
+
+.export-link:disabled {
+  cursor: default;
+}
+
+@keyframes export-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

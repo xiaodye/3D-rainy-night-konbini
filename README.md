@@ -104,7 +104,6 @@ _一座 26×26 米的微缩街角：SUNMART 便利店、两栋邻居楼、雨、
 - **场景层**（原生 three.js r169，9 个模块约 3,600 行）：全部渲染逻辑，经 `bootDiorama()` 装配，通过 `window.__DIORAMA` 暴露调试句柄
 - **桥接**：`SceneDriver` 每帧把滚动进度翻译成相机位姿；`WaterPanel` 把滑块写进 uniform；`zustand` 承载滚动进度 / 视角模式 / 水面参数
 
-
 ## 🚀 快速开始
 
 ```bash
@@ -131,8 +130,21 @@ pnpm preview       # 本地预览构建产物
 | 渲染 | `?msaa=0\|2\|4` · `?rtsize=512` · `?nopost` · `?dbgr=1`              |
 | 相机 | `?az=&el=&d=&tx=&ty=&tz=`（球坐标机位）· `?t=8`（冻结时间）          |
 | 视图 | `?nopanel` · `?debug=refl`（反射通道可视化）· `?skipintro` · `?door` |
+| 导出 | `?export=glb`（下载整个场景的 glTF 模型，见下节）                    |
 
 例如 `?pool=0.1&t=8&az=23&el=21&d=47`：冻结在第 8 秒、固定机位、半强光池。
+
+## 📦 模型导出
+
+点击右上角的 **⤓ 下载图标**（或访问 `?export=glb`），浏览器会自动下载整个场景的 glTF 二进制模型：
+
+```text
+rainy-night-konbini.glb   ≈ 7 MB · glTF 2.0 · 309 meshes · 23 张内嵌贴图
+```
+
+- 包含全部几何与层级、PBR 材质（toon / 自定义着色器已自动转换为标准材质）、Canvas 绘制的贴图与灯光
+- 雨粒子（GPU 点系统）与后处理不属于网格，不在导出范围内
+- 可直接导入 **Blender**（File → Import → glTF 2.0）、Unity、Unreal 或任何 glTF 兼容工具
 
 ## 📁 目录结构
 
