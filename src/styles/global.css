@@ -271,21 +271,25 @@ html.is-orbit .scroll-hint {
 /* deliberately quiet: film-caption typography, hairline rules, no glass glow */
 .water-ui {
   position: fixed;
-  left: 18px;
-  bottom: 18px;
+  right: 18px;
+  top: 54px;              /* stacked under the view-mode switch */
   z-index: 20;
   pointer-events: auto;
   font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
 }
 
 .water-tab {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 2px 0 2px 11px;
+  padding: 2px 11px 2px 0;
   background: none;
   border: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.22);
+  border-right: 1px solid rgba(255, 255, 255, 0.22);
   color: rgba(255, 255, 255, 0.42);
   font: inherit;
   font-size: 11px;
@@ -451,6 +455,7 @@ html.is-orbit .scroll-hint {
   .water-ui {
     left: 0;
     right: 0;
+    top: auto;
     bottom: 0;
   }
 
@@ -671,4 +676,42 @@ html.is-orbit .scroll-hint {
 .noscript-note p + p {
   margin-top: 12px;
   color: rgba(255, 255, 255, 0.45);
+}
+
+/* GitHub repo link, sitting at the far right of the view-mode switch */
+.gh-link {
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.3);
+  transition: color 0.45s ease, transform 0.45s ease;
+}
+
+.gh-link svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
+.gh-link:hover {
+  color: rgba(255, 255, 255, 0.78);
+  transform: translateY(-1px);
+}
+
+/* GitHub repo link, sitting at the far right of the view-mode switch */
+.gh-link {
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.3);
+  transition: color 0.45s ease, transform 0.45s ease;
+}
+
+.gh-link svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
+.gh-link:hover {
+  color: rgba(255, 255, 255, 0.78);
+  transform: translateY(-1px);
 }
