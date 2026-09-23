@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#070b14" />
+    <meta name="theme-color" content="#04060c" />
     <meta name="description" content="A quiet corner, somewhere in Tokyo. An interactive rainy night diorama." />
     <title>Rainy Night Convenience Store</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -14,7 +14,15 @@
     />
   </head>
   <body>
+    <!-- 3D diorama scene (built & rendered by public/diorama.js) -->
+    <canvas id="c"></canvas>
+    <div id="vig"></div>
+
+    <!-- HTML narrative / loading layer -->
     <div id="root"></div>
+
+    <!-- the diorama bundle: builds the whole rainy-night street scene -->
+    <script defer src="/diorama.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

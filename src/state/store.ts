@@ -8,12 +8,15 @@ interface ExperienceState {
   scrollProgress: number
   /** 'loading' -> 'entering' (light intro) -> 'ready' */
   phase: Phase
+  /** true once the WebGL diorama has rendered its first frames */
+  sceneReady: boolean
   hovered: HoverTarget
   isMobile: boolean
   reducedMotion: boolean
 
   setScrollProgress: (p: number) => void
   setPhase: (p: Phase) => void
+  setSceneReady: (v: boolean) => void
   setHovered: (h: HoverTarget) => void
   setQuality: (isMobile: boolean, reducedMotion: boolean) => void
 }
@@ -21,12 +24,14 @@ interface ExperienceState {
 export const useExperience = create<ExperienceState>((set) => ({
   scrollProgress: 0,
   phase: 'loading',
+  sceneReady: false,
   hovered: null,
   isMobile: false,
   reducedMotion: false,
 
   setScrollProgress: (p) => set({ scrollProgress: p }),
   setPhase: (p) => set({ phase: p }),
+  setSceneReady: (v) => set({ sceneReady: v }),
   setHovered: (h) => set({ hovered: h }),
   setQuality: (isMobile, reducedMotion) => set({ isMobile, reducedMotion }),
 }))

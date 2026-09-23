@@ -10,7 +10,7 @@ html {
 
 html,
 body {
-  background: #070b14;
+  background: #04060c;
   color: rgba(255, 255, 255, 0.7);
   font-family: 'Inter', 'Noto Sans JP', 'Helvetica Neue', sans-serif;
   font-weight: 400;
@@ -26,14 +26,35 @@ body {
   background: rgba(120, 160, 220, 0.25);
 }
 
-/* ---------- WebGL canvas ---------- */
-.webgl {
+/* ---------- WebGL diorama canvas (built by public/diorama.js) ---------- */
+#c {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   z-index: 0;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+  outline: none;
+}
+
+#c:active {
+  cursor: grabbing;
+}
+
+/* cinematic vignette above the canvas, below the narrative */
+#vig {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    125% 105% at 50% 46%,
+    rgba(0, 0, 0, 0) 40%,
+    rgba(3, 5, 10, 0.26) 70%,
+    rgba(2, 3, 7, 0.64) 100%
+  );
 }
 
 /* ---------- Loading screen ---------- */
@@ -41,7 +62,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: #070b14;
+  background: #04060c;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -90,7 +111,7 @@ body {
 /* ---------- Scroll narrative ---------- */
 .narrative {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   pointer-events: none;
 }
 
