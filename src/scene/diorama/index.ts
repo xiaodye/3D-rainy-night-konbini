@@ -16,30 +16,30 @@
  * TYPED ✓ — see docs/source-restore.md.
  */
 
-import * as THREE from 'three'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-import { Builder } from './toon'
-import { buildSky } from './sky'
-import { buildGround } from './ground'
-import { buildStore } from './store'
-import { buildProps } from './props'
-import { buildRain } from './rain'
-import { PostFX } from './postfx'
-import type { BuildStats } from './toon'
-import type { Sky } from './sky'
-import type { StoreHandle } from './store'
-import type { PropsHandle } from './props'
-import type { RainHandle } from './rain'
-import type { DioramaHandle } from './adapter'
+import { Builder } from "./toon";
+import { buildSky } from "./sky";
+import { buildGround } from "./ground";
+import { buildStore } from "./store";
+import { buildProps } from "./props";
+import { buildRain } from "./rain";
+import { PostFX } from "./postfx";
+import type { BuildStats } from "./toon";
+import type { Sky } from "./sky";
+import type { StoreHandle } from "./store";
+import type { PropsHandle } from "./props";
+import type { RainHandle } from "./rain";
+import type { DioramaHandle } from "./adapter";
 
 // re-export the adapter surface so `from './diorama'` keeps working
-export * from './adapter'
+export * from "./adapter";
 
 declare global {
   interface Window {
     /** published by bootDiorama() for the diagnostic scripts and screenshot tooling */
-    __DIORAMA?: DioramaScene
+    __DIORAMA?: DioramaScene;
   }
 }
 
@@ -48,16 +48,16 @@ declare global {
  * A superset of `DioramaHandle`, which is the minimal surface the UI needs.
  */
 export interface DioramaScene extends DioramaHandle {
-  scene: THREE.Scene
-  stats: BuildStats
-  sky: Sky
-  store: StoreHandle
-  props: PropsHandle
-  rain: RainHandle
-  THREE: typeof THREE
+  scene: THREE.Scene;
+  stats: BuildStats;
+  sky: Sky;
+  store: StoreHandle;
+  props: PropsHandle;
+  rain: RainHandle;
+  THREE: typeof THREE;
 }
 
-let handle: DioramaScene | null = null
+let handle: DioramaScene | null = null;
 
 /**
  * Build the diorama and start its render loop. Idempotent: repeated calls
@@ -66,16 +66,20 @@ let handle: DioramaScene | null = null
  * Requires `<canvas id="scene">` to be in the document.
  */
 export function bootDiorama(): DioramaScene {
-  if (handle) return handle
+  if (handle) return handle;
 
   // --- query params (debug views / deterministic captures) -------------------
   const qs = new URLSearchParams(location.search);
   const num = (k: string, d: number): number => (qs.has(k) ? parseFloat(qs.get(k) as string) : d);
 
   // --- renderer --------------------------------------------------------------
-  const canvas = document.getElementById('scene') as HTMLCanvasElement;
+  const canvas = document.getElementById("scene") as HTMLCanvasElement;
   const renderer = new THREE.WebGLRenderer({
-    canvas, antialias: false, powerPreference: 'high-performance', alpha: false, stencil: false,
+    canvas,
+    antialias: false,
+    powerPreference: "high-performance",
+    alpha: false,
+    stencil: false,
   });
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
   renderer.setSize(innerWidth, innerHeight, false);
@@ -100,7 +104,7 @@ export function bootDiorama(): DioramaScene {
   controls.screenSpacePanning = false;
   controls.minDistance = 7;
   controls.maxDistance = 78;
-  controls.minPolarAngle = 0.10;
+  controls.minPolarAngle = 0.1;
   controls.maxPolarAngle = 1.47;
   controls.target.set(1.6, 1.05, -1.8);
 
@@ -135,35 +139,38 @@ export function bootDiorama(): DioramaScene {
   const sky = buildSky(scene);
   const { ground } = buildGround(builder, renderer, scene);
 
-  const store = buildStore(builder, scene, { ground, forceDoor: qs.has('door') });
+  const store = buildStore(builder, scene, { ground, forceDoor: qs.has("door") });
   const props = buildProps(builder, scene, { ground });
-  const rain = buildRain(scene, { ground, splash: !qs.has('nosplash') });
+  const rain = buildRain(scene, { ground, splash: !qs.has("nosplash") });
 
-  ground.maxSize = num('rtsize', 896);
-  ground.uniforms.uDebugRefl.value = num('dbgr', 0);
-  document.documentElement.setAttribute('data-dbg', `rip=${ground.uniforms.uRipAmp.value} dbgr=${ground.uniforms.uDebugRefl.value} rt=${ground.rt.width} vp=${innerWidth}x${innerHeight} dpr=${renderer.getPixelRatio()}`);
+  ground.maxSize = num("rtsize", 896);
+  ground.uniforms.uDebugRefl.value = num("dbgr", 0);
+  document.documentElement.setAttribute(
+    "data-dbg",
+    `rip=${ground.uniforms.uRipAmp.value} dbgr=${ground.uniforms.uDebugRefl.value} rt=${ground.rt.width} vp=${innerWidth}x${innerHeight} dpr=${renderer.getPixelRatio()}`,
+  );
 
   const stats = builder.finalize();
   scene.add(builder.root);
-  document.documentElement.setAttribute('data-stats', JSON.stringify({ ...stats, calls: renderer.info.render.calls }));
+  document.documentElement.setAttribute("data-stats", JSON.stringify({ ...stats, calls: renderer.info.render.calls }));
 
   // --- post ------------------------------------------------------------------
   // MSAA 2 instead of the upstream 4: this scene is fill-rate bound and the
   // composite pass already softens edges. See docs/performance-report.md.
-  const post = new PostFX(renderer, num('msaa', 2));
+  const post = new PostFX(renderer, num("msaa", 2));
 
   // --- parameter initial values ----------------------------------------------
   // These used to reach the uniforms through the upstream panel's DOM ranges.
   // Now they are applied directly — a URL override still wins over the default,
   // and our React panel reads the resulting live values back out.
-  ground.uniforms.uWaveScale.value = num('wave', 0.6);
-  ground.uniforms.uRipAmp.value = num('rip', 1);
-  ground.uniforms.uReflStrength.value = num('refl', 0.85);
-  ground.uniforms.uWaterDark.value = num('dark', 0.55);
-  ground.uniforms.uSparkle.value = num('spark', 0.02);
-  ground.uniforms.uPoolStrength.value = num('pool', 1.2);
-  rain.setAmount(num('rain', 1));
-  post.composite.material.uniforms.uExposure.value = num('expo', 1.62);
+  ground.uniforms.uWaveScale.value = num("wave", 0.6);
+  ground.uniforms.uRipAmp.value = num("rip", 1);
+  ground.uniforms.uReflStrength.value = num("refl", 0.85);
+  ground.uniforms.uWaterDark.value = num("dark", 0.55);
+  ground.uniforms.uSparkle.value = num("spark", 0.02);
+  ground.uniforms.uPoolStrength.value = num("pool", 0.01);
+  rain.setAmount(num("rain", 1));
+  post.composite.material.uniforms.uExposure.value = num("expo", 1.62);
 
   // --- camera framing --------------------------------------------------------
   function fitCamera(azDeg: number, elDeg: number, dist: number): void {
@@ -182,20 +189,21 @@ export function bootDiorama(): DioramaScene {
   const DEFAULT_EL = 18;
   function defaultDistance(): number {
     const aspect = innerWidth / innerHeight;
-    return THREE.MathUtils.clamp(46 * (1.80 / aspect) ** 0.5, 30, 78);
+    return THREE.MathUtils.clamp(46 * (1.8 / aspect) ** 0.5, 30, 78);
   }
 
-  const useCustomView = ['az', 'el', 'd'].some((k) => qs.has(k));
+  const useCustomView = ["az", "el", "d"].some((k) => qs.has(k));
   if (useCustomView) {
-    controls.target.set(num('tx', 0.4), num('ty', 1.15), num('tz', -1.0));
-    fitCamera(num('az', DEFAULT_AZ), num('el', DEFAULT_EL), num('d', defaultDistance()));
+    controls.target.set(num("tx", 0.4), num("ty", 1.15), num("tz", -1.0));
+    fitCamera(num("az", DEFAULT_AZ), num("el", DEFAULT_EL), num("d", defaultDistance()));
   } else {
     fitCamera(DEFAULT_AZ, DEFAULT_EL, defaultDistance());
   }
 
   // --- resize ----------------------------------------------------------------
   function resize(): void {
-    const w = innerWidth, h = innerHeight;
+    const w = innerWidth,
+      h = innerHeight;
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h, false);
@@ -203,17 +211,17 @@ export function bootDiorama(): DioramaScene {
     const dpr = renderer.getPixelRatio();
     ground.setSize(w * dpr, h * dpr);
   }
-  addEventListener('resize', resize);
+  addEventListener("resize", resize);
   resize();
 
   // --- loop ------------------------------------------------------------------
   const clock = new THREE.Clock();
-  const frozen = qs.has('t');
+  const frozen = qs.has("t");
   let elapsed = 0;
 
   function frame(): void {
     const dt = Math.min(clock.getDelta(), 0.05);
-    elapsed = frozen ? num('t', 0) : elapsed + dt;
+    elapsed = frozen ? num("t", 0) : elapsed + dt;
 
     controls.update();
     sky.update(elapsed, camera);
@@ -225,10 +233,12 @@ export function bootDiorama(): DioramaScene {
 
     ground.renderMirror(scene, camera);
 
-    if (qs.has('nopost')) { renderer.setRenderTarget(null); renderer.render(scene, camera); }
-    else {
+    if (qs.has("nopost")) {
+      renderer.setRenderTarget(null);
+      renderer.render(scene, camera);
+    } else {
       post.render(scene, camera, elapsed);
-      if (qs.get('debug') === 'refl') {
+      if (qs.get("debug") === "refl") {
         const u = post.composite.material.uniforms;
         u.tScene.value = ground.rt.texture;
         u.uBloom.value = 0;
@@ -236,14 +246,27 @@ export function bootDiorama(): DioramaScene {
         post.composite.render(renderer, null);
       }
     }
-    requestAnimationFrame(frame);}
+    requestAnimationFrame(frame);
+  }
   requestAnimationFrame(frame);
 
   // --- handle ----------------------------------------------------------------
   // Kept on window as well: the diagnostic scripts in docs/performance-report.md
   // and the screenshot tooling read it from there.
   const diorama: DioramaScene = {
-    scene, camera, controls, renderer, post, stats, fitCamera, ground, store, props, rain, sky, THREE,
+    scene,
+    camera,
+    controls,
+    renderer,
+    post,
+    stats,
+    fitCamera,
+    ground,
+    store,
+    props,
+    rain,
+    sky,
+    THREE,
   };
   handle = diorama;
   window.__DIORAMA = diorama;

@@ -110,7 +110,12 @@ export const WATER_PARAMS: WaterParamSpec[] = [
   { key: "refl", label: "反射亮度", min: 0, max: 1.6, step: 0.01, dp: 2, default: 0.85 },
   { key: "dark", label: "水面暗度", min: 0, max: 1, step: 0.01, dp: 2, default: 0.55 },
   { key: "spark", label: "波峰高光", min: 0, max: 0.2, step: 0.005, dp: 3, default: 0.02 },
-  { key: "pool", label: "地面灯光", min: 0, max: 2.5, step: 0.05, dp: 2, default: 1.2 },
+  // the shader saturates the summed pools, so 0-1 is the useful range
+  // a gain on the summed pools: useful range is small, and the slider
+  // steps finely so the low end stays controllable
+  // a gain on the summed pools: useful range is small, and the slider
+  // steps finely so the low end stays controllable
+  { key: "pool", label: "地面灯光", min: 0, max: 0.5, step: 0.005, dp: 3, default: 0.06 },
   { key: "rain", label: "雨量", min: 0, max: 1.5, step: 0.05, dp: 2, default: 1 },
   { key: "expo", label: "曝光", min: 0.6, max: 2.2, step: 0.02, dp: 2, default: 1.62 },
 ];
