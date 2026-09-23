@@ -8,17 +8,11 @@
   由 `src/scene/SceneDriver.tsx` 驱动相机做五幕滚动叙事。
 - 当前入口：`src/App.tsx` → `SceneDriver` + `ScrollNarrative` + `WaterPanel` + `LoadingScreen`。
 
-## ⚠️ 重要警告：不要混用两套 three
+## three 版本
 
-| | 版本 | 形态 | 位置 |
-|---|---|---|---|
-| 本目录（旧实现） | three **0.169** | ESM，`import * as THREE from 'three'` | `node_modules/three` |
-| 线上场景（新） | three **r160** | UMD，挂 `window.THREE` | `public/vendor/three-r160.js` |
-
-两者是**不同的运行时实例**，跨实例的 `instanceof`（如 `obj instanceof THREE.Mesh`）会失效，
-几何/材质对象也不能互通。因此：
-- 新代码（`src/scene/*`、`src/ui/*`）**一律不 import `three`**，只通过 `window.__DIORAMA` 的结构化接口操作。
-- 若哪天要回退到本目录的实现，请确认没有同时加载 `public/vendor/three-r160.js`。
+本目录与线上场景（`src/scene/diorama/`）现在**共用同一个 three**（`node_modules/three`，ESM）。
+场景源码还原之前，线上用的是内联的 r160 UMD 副本，两者不能混用（跨实例 `instanceof` 会失效）；
+该副本已归档到 `_legacy/three-r160.js`，仅在需要对照旧产物时才用得上。
 
 ## 回退办法（如需）
 1. `index.html`：把 `<canvas id="scene">` 改回 `id="c"`，去掉两段 demo 的 `defer` 脚本。

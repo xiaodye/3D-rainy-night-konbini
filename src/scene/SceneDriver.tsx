@@ -5,7 +5,8 @@ import {
   getDiorama,
   hasQueryFlag,
   type DioramaHandle,
-} from './diorama'
+} from './diorama/adapter'
+import { bootDiorama } from './diorama'
 import { interpolateActs, OPENING_POSE } from './keyframes'
 
 /**
@@ -35,8 +36,6 @@ const NARRATIVE = { minDistance: 0.6, maxDistance: 160, minPolar: 0.05, maxPolar
 const FREE = { minDistance: 6, maxDistance: 90, minPolar: 0.1, maxPolar: 1.52 }
 /** 360° exploration: as much room as feels good without losing the model */
 const EXPLORE = { minDistance: 2.5, maxDistance: 120, minPolar: 0.06, maxPolar: 1.6 }
-
-const BOOT_TIMEOUT_MS = 12000
 
 /** module-level guard so React StrictMode's double mount can't double-init */
 let didInit = false
@@ -71,7 +70,6 @@ export default function SceneDriver() {
 
     let raf = 0
     let disposed = false
-    const startedAt = performance.now()
     let wheelTarget: HTMLCanvasElement | null = null
 
     /**
@@ -156,23 +154,27 @@ export default function SceneDriver() {
     const tick = (now: number) => {
       if (disposed) return
 
-      const dio = getDiorama()
+      // Boot the scene once (idempotent, synchronous). It looks up
+      // <canvas id="scene"> by id, so the element must already be in the DOM —
+      // which it is, since this runs from a React effect after mount.
+      let dio = getDiorama()
       if (!dio) {
-        if (now - startedAt > BOOT_TIMEOUT_MS) {
-          markBoot('no-diorama')
-          console.error('[diorama] boot timeout — window.__DIORAMA never appeared')
-          return
-        }
-        raf = requestAnimationFrame(tick)
-        return
-      }
-
-      if (!didInit) {
         if (!document.getElementById('scene')) {
           markBoot('no-canvas')
-          console.error('[diorama] #scene canvas missing (the bundle looks it up by id)')
+          console.error('[diorama] #scene canvas missing — the scene looks it up by id')
           return
         }
+        try {
+          dio = bootDiorama()
+        } catch (err) {
+          markBoot('boot-error')
+          console.error('[diorama] boot failed', err)
+          return
+        }
+      }
+      if (!dio) return
+
+      if (!didInit) {
         init(dio)
         markBoot('init')
       }

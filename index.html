@@ -14,68 +14,13 @@
     />
   </head>
   <body>
-    <!-- 3D diorama scene (built & rendered by /diorama.js) -->
+    <!-- 3D diorama surface; the scene (src/scene/diorama) looks it up by this id -->
     <canvas id="scene"></canvas>
     <div id="vig"></div>
 
     <!-- HTML narrative / loading / water panel layer -->
     <div id="root"></div>
 
-    <!--
-      REQUIRED by /diorama.js — 请勿删除。
-      上游 demo 的自带调参面板代码会直接读取这些元素（缺 #hide 会抛错，导致整个场景不渲染），
-      同时它是 URL 参数（?wave= ?rip= ?refl= …）的落点：
-      demo 启动时会把"URL 参数优先"的结果写进这些 range 的 value，
-      我们的 React 面板从这些 value 读取初值，从而保持一致语义。
-      整块在样式上隐藏（见 global.css 的 #demo-ui）。
-    -->
-    <div id="demo-ui" hidden aria-hidden="true">
-      <div id="ui">
-        <div id="panel">
-          <h3>水面调参 <button id="hide" type="button">隐藏</button></h3>
-          <div class="row"><label>波纹强度</label><input id="s-wave" type="range" min="0" max="1.6" step="0.01" value="0.8" /><output id="o-wave">0.80</output></div>
-          <div class="row"><label>雨点涟漪</label><input id="s-rip" type="range" min="0" max="2" step="0.01" value="1" /><output id="o-rip">1.00</output></div>
-          <div class="row"><label>反射亮度</label><input id="s-refl" type="range" min="0" max="1.6" step="0.01" value="0.85" /><output id="o-refl">0.85</output></div>
-          <div class="row"><label>水面暗度</label><input id="s-dark" type="range" min="0" max="1" step="0.01" value="0.55" /><output id="o-dark">0.55</output></div>
-          <div class="row"><label>波峰高光</label><input id="s-spark" type="range" min="0" max="0.2" step="0.005" value="0.02" /><output id="o-spark">0.02</output></div>
-          <div class="row"><label>地面灯光</label><input id="s-pool" type="range" min="0" max="2.5" step="0.05" value="1.2" /><output id="o-pool">1.20</output></div>
-          <div class="row"><label>雨量</label><input id="s-rain" type="range" min="0" max="1.5" step="0.05" value="1" /><output id="o-rain">1.00</output></div>
-          <div class="row"><label>曝光</label><input id="s-expo" type="range" min="0.6" max="2.2" step="0.02" value="1.62" /><output id="o-expo">1.62</output></div>
-        </div>
-      </div>
-      <button id="show" class="hidden" type="button">水面调参</button>
-    </div>
-
-    <!--
-      Performance defaults for the diorama bundle, injected BEFORE it boots.
-      The bundle reads these from location.search, so this is the zero-patch way
-      to change its constructor-time settings. An explicit value in the visitor's
-      own URL always wins.
-
-      msaa: the bundle defaults to 4× MSAA on a full-screen render target. On
-      fill-rate limited GPUs (e.g. Apple silicon laptops) that alone costs more
-      than half the frame budget, and the bloom/vignette/grain composite pass
-      already softens edges — 2× keeps a clean look at a fraction of the cost.
-    -->
-    <script>
-      (function () {
-        try {
-          var url = new URL(location.href)
-          var changed = false
-          if (!url.searchParams.has('msaa')) {
-            url.searchParams.set('msaa', '2')
-            changed = true
-          }
-          if (changed) history.replaceState(null, '', url)
-        } catch (e) {
-          /* very old browsers: the bundle's own default still applies */
-        }
-      })()
-    </script>
-
-    <!-- three.js r160 (UMD) + the diorama scene bundle; load order matters -->
-    <script defer src="/vendor/three-r160.js"></script>
-    <script defer src="/diorama.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -30,7 +30,7 @@ body {
   background: rgba(120, 160, 220, 0.25);
 }
 
-/* ---------- WebGL diorama canvas (built by public/diorama.js) ---------- */
+/* ---------- WebGL diorama canvas (scene built by src/scene/diorama) ---------- */
 /* id must stay `scene` — the bundle looks it up by that name */
 #scene {
   position: fixed;

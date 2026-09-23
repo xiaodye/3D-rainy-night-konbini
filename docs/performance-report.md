@@ -13,11 +13,11 @@
 
 反直觉的地方在于，新场景的几何量**更小**：
 
-| | 上一版场景 | 新版场景 |
-|---|---|---|
-| 网格数 | 492 | 1318 |
-| 静态三角面 | 48,770 | 26,214 |
-| 每帧 draw calls | — | ~317 |
+|                 | 上一版场景 | 新版场景 |
+| --------------- | ---------- | -------- |
+| 网格数          | 492        | 1318     |
+| 静态三角面      | 48,770     | 26,214   |
+| 每帧 draw calls | —          | ~317     |
 
 三角面少了 46%，却更卡 —— 说明瓶颈不在几何，需要在**每帧像素负载**上找原因。
 
@@ -32,23 +32,23 @@
 - 用 WebGL 调试扩展确认渲染后端，避免误读软件渲染的数据：
 
   ```js
-  const gl = window.__DIORAMA.renderer.getContext()
-  const dbg = gl.getExtension('WEBGL_debug_renderer_info')
-  gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)
+  const gl = window.__DIORAMA.renderer.getContext();
+  const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+  gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
   // → "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"  ✅ 真硬件
-  gl.getParameter(gl.MAX_SAMPLES)   // → 4（MSAA 上限）
+  gl.getParameter(gl.MAX_SAMPLES); // → 4（MSAA 上限）
   ```
 
 - 同时采集渲染器的客观状态（这些是**可复现的事实**，不依赖帧率）：
 
   ```js
-  const d = window.__DIORAMA
-  d.renderer.info.render.calls        // 每帧 draw calls
-  d.renderer.info.render.triangles    // 每帧三角面（含反射 pass）
-  d.renderer.getPixelRatio()          // 当前 DPR
-  d.renderer.domElement.width * d.renderer.domElement.height  // 渲染像素数
-  d.ground.rt.width                   // 平面反射 render target 尺寸
-  d.renderer.shadowMap.autoUpdate     // 阴影是否每帧重算
+  const d = window.__DIORAMA;
+  d.renderer.info.render.calls; // 每帧 draw calls
+  d.renderer.info.render.triangles; // 每帧三角面（含反射 pass）
+  d.renderer.getPixelRatio(); // 当前 DPR
+  d.renderer.domElement.width * d.renderer.domElement.height; // 渲染像素数
+  d.ground.rt.width; // 平面反射 render target 尺寸
+  d.renderer.shadowMap.autoUpdate; // 阴影是否每帧重算
   ```
 
 ### 2.2 第一版方法（失败，值得记录）
@@ -65,40 +65,46 @@
 
 ### 2.3 修正后的方法（可靠）
 
-| 准则 | 做法 | 为什么 |
-|---|---|---|
-| ① 充分预热 | 加载后静置 **24–26 秒**再采样 | 等编译/上传/升频完成 |
-| ② 同页面 A/B 交替 | 在同一页面内用 `evaluate` 切换配置并交替测量 | 消除 reload 带来的冷启动变量 |
-| ③ 单次采样 ≤15 秒 | 一次 `evaluate` 只采 4–5 秒 | 工具层面 `evaluate` 15 秒超时会中断并产生假数据 |
-| ④ 避免连续高压测量 | 每轮之间留 1~3 秒，能交替就交替 | 抵消 GPU 降频漂移 |
-| ⑤ 报告不确定性 | 标注"这是最可信的一次"，不把噪声当结论 | 见第 5 节的坦白 |
+| 准则               | 做法                                         | 为什么                                          |
+| ------------------ | -------------------------------------------- | ----------------------------------------------- |
+| ① 充分预热         | 加载后静置 **24–26 秒**再采样                | 等编译/上传/升频完成                            |
+| ② 同页面 A/B 交替  | 在同一页面内用 `evaluate` 切换配置并交替测量 | 消除 reload 带来的冷启动变量                    |
+| ③ 单次采样 ≤15 秒  | 一次 `evaluate` 只采 4–5 秒                  | 工具层面 `evaluate` 15 秒超时会中断并产生假数据 |
+| ④ 避免连续高压测量 | 每轮之间留 1~3 秒，能交替就交替              | 抵消 GPU 降频漂移                               |
+| ⑤ 报告不确定性     | 标注"这是最可信的一次"，不把噪声当结论       | 见第 5 节的坦白                                 |
 
 测量脚本（预热在外部完成）：
 
 ```js
 // 单次采样：返回 4 秒内的平均帧率
-await page.evaluate(() => new Promise((res) => {
-  let frames = 0
-  const t0 = performance.now()
-  ;(function loop() {
-    frames++
-    const dt = performance.now() - t0
-    if (dt < 4000) requestAnimationFrame(loop)
-    else res(+(frames / (dt / 1000)).toFixed(1))
-  })()
-}))
+await page.evaluate(
+  () =>
+    new Promise((res) => {
+      let frames = 0;
+      const t0 = performance.now();
+      (function loop() {
+        frames++;
+        const dt = performance.now() - t0;
+        if (dt < 4000) requestAnimationFrame(loop);
+        else res(+(frames / (dt / 1000)).toFixed(1));
+      })();
+    }),
+);
 ```
 
 ```js
 // 同页面切换配置（不需要 reload，避免冷启动变量）
-await page.evaluate((cfg) => {
-  const d = window.__DIORAMA
-  d.renderer.setPixelRatio(cfg.dpr)
-  d.ground.maxSize = cfg.reflect
-  d.renderer.shadowMap.autoUpdate = cfg.dynamicShadow
-  d.renderer.shadowMap.needsUpdate = true
-  window.dispatchEvent(new Event('resize'))   // 让 bundle 重建 post / 反射目标
-}, { dpr: 1.75, reflect: 640, dynamicShadow: false })
+await page.evaluate(
+  (cfg) => {
+    const d = window.__DIORAMA;
+    d.renderer.setPixelRatio(cfg.dpr);
+    d.ground.maxSize = cfg.reflect;
+    d.renderer.shadowMap.autoUpdate = cfg.dynamicShadow;
+    d.renderer.shadowMap.needsUpdate = true;
+    window.dispatchEvent(new Event("resize")); // 让 bundle 重建 post / 反射目标
+  },
+  { dpr: 1.75, reflect: 640, dynamicShadow: false },
+);
 ```
 
 ### 2.4 帧率测不出来时的替代指标：结构性负载核算
@@ -125,12 +131,12 @@ await page.evaluate((cfg) => {
 
 demo 支持 `?nopost`、`?rtsize=`、`?msaa=` 等开关，可直接隔离各子系统：
 
-| 配置 | 测得 fps | 结论 |
-|---|---|---|
-| 基线（默认） | 13.2 | — |
-| `?nopost`（关后处理） | 13.6 | 后处理几乎无影响 |
-| `?rtsize=256`（反射降到 256²） | 12.3 | 反射目标尺寸不是主因 |
-| **`?msaa=0`** | **19.8** | **MSAA 是最大单项（+50%）** |
+| 配置                           | 测得 fps | 结论                        |
+| ------------------------------ | -------- | --------------------------- |
+| 基线（默认）                   | 13.2     | —                           |
+| `?nopost`（关后处理）          | 13.6     | 后处理几乎无影响            |
+| `?rtsize=256`（反射降到 256²） | 12.3     | 反射目标尺寸不是主因        |
+| **`?msaa=0`**                  | **19.8** | **MSAA 是最大单项（+50%）** |
 
 绝对值不可信，但**相对排序在两次独立测量中一致**：MSAA 的影响远大于后处理与反射尺寸。
 
@@ -138,25 +144,25 @@ demo 支持 `?nopost`、`?rtsize=`、`?msaa=` 等开关，可直接隔离各子�
 
 进一步核对 bundle 的渲染配置，发现四个叠加的全屏开销：
 
-| 项目 | 上一版场景 | 新版场景（默认） | 每帧代价 |
-|---|---|---|---|
-| 抗锯齿 | MSAA 关闭 + SMAA 后处理 | **MSAA 4×** | 全屏采样数 ×4 |
-| 湿地反射 | 假的加法混合贴花（无额外 pass） | **每帧全屏平面镜像渲染** | 整个场景再画一遍 |
-| 阴影 | `shadowMap.autoUpdate = false`（烘焙一次） | **每帧重算 2048²** | 全屏几何 + 阴影图光栅化 |
-| 渲染分辨率 | DPR 2 | DPR 2 | 5.3M 像素（1510×885 CSS 视口） |
+| 项目       | 上一版场景                                 | 新版场景（默认）         | 每帧代价                       |
+| ---------- | ------------------------------------------ | ------------------------ | ------------------------------ |
+| 抗锯齿     | MSAA 关闭 + SMAA 后处理                    | **MSAA 4×**              | 全屏采样数 ×4                  |
+| 湿地反射   | 假的加法混合贴花（无额外 pass）            | **每帧全屏平面镜像渲染** | 整个场景再画一遍               |
+| 阴影       | `shadowMap.autoUpdate = false`（烘焙一次） | **每帧重算 2048²**       | 全屏几何 + 阴影图光栅化        |
+| 渲染分辨率 | DPR 2                                      | DPR 2                    | 5.3M 像素（1510×885 CSS 视口） |
 
 **结论：这是典型的 fill-rate（像素填充率）瓶颈**，不是几何瓶颈。上一版场景之所以流畅，正是因为它没有镜像 pass、且阴影是静态烘焙的 —— 同样的做法在新场景里被换成了"每帧全做"。
 
 ### 3.3 负载核算（同一 CSS 视口下的理论值）
 
-| 指标 | 优化前 | 优化后 | 变化 |
-|---|---|---|---|
-| MSAA 采样数 | 4× | 2× | −50% |
-| 每 CSS 像素的采样数（主 pass + 镜像 pass） | 4 × 2 = 8 | 2 × 2 = 4 | **−50%** |
-| 渲染像素数（DPR 2 → 1.75） | 1.00× | 0.766× | **−23%** |
-| 反射 render target | 896² = 0.80M px | 640² = 0.41M px | **−49%** |
-| 每帧阴影 pass | 2048² = 4.2M px + 全场景光栅化 | 一次性（烘焙） | **消除** |
-| **综合像素/采样负载** | 基准 | — | **≈ −60%** |
+| 指标                                       | 优化前                         | 优化后          | 变化       |
+| ------------------------------------------ | ------------------------------ | --------------- | ---------- |
+| MSAA 采样数                                | 4×                             | 2×              | −50%       |
+| 每 CSS 像素的采样数（主 pass + 镜像 pass） | 4 × 2 = 8                      | 2 × 2 = 4       | **−50%**   |
+| 渲染像素数（DPR 2 → 1.75）                 | 1.00×                          | 0.766×          | **−23%**   |
+| 反射 render target                         | 896² = 0.80M px                | 640² = 0.41M px | **−49%**   |
+| 每帧阴影 pass                              | 2048² = 4.2M px + 全场景光栅化 | 一次性（烘焙）  | **消除**   |
+| **综合像素/采样负载**                      | 基准                           | —               | **≈ −60%** |
 
 ---
 
@@ -172,19 +178,26 @@ demo 支持 `?nopost`、`?rtsize=`、`?msaa=` 等开关，可直接隔离各子�
 <script>
   (function () {
     try {
-      var url = new URL(location.href)
-      if (!url.searchParams.has('msaa')) {
-        url.searchParams.set('msaa', '2')
-        history.replaceState(null, '', url)
+      var url = new URL(location.href);
+      if (!url.searchParams.has("msaa")) {
+        url.searchParams.set("msaa", "2");
+        history.replaceState(null, "", url);
       }
-    } catch (e) { /* 老浏览器退回 bundle 默认值 */ }
-  })()
+    } catch (e) {
+      /* 老浏览器退回 bundle 默认值 */
+    }
+  })();
 </script>
 <script defer src="/vendor/three-r160.js"></script>
 <script defer src="/diorama.js"></script>
 ```
 
 内联脚本在 HTML 解析时立即执行，早于 defer 脚本，因此 bundle 读到的 `location.search` 已包含 `msaa=2`。而访问者自己显式写的参数永远优先。
+
+> **后续更新（2026-09-23）**：场景代码后来已还原为项目内的 TS 源码（见 [`source-restore.md`](./source-restore.md)），
+> 这个注入 hack 随之删除 —— 默认值现在直接写在 `src/scene/diorama/index.ts`：
+> `new PostFX(renderer, num('msaa', 2))`，`?msaa=` 依然可由 URL 覆盖。
+> 上面这段保留下来，是因为它记录了"不能改源码"时的解法，遇到同类场景可直接复用。
 
 ### 4.2 阴影改为静态烘焙
 
@@ -193,8 +206,8 @@ demo 支持 `?nopost`、`?rtsize=`、`?msaa=` 等开关，可直接隔离各子�
 **怎么实现（运行时设置，不改 bundle）**：
 
 ```ts
-dio.renderer.shadowMap.autoUpdate = false
-dio.renderer.shadowMap.needsUpdate = true   // 触发一次烘焙
+dio.renderer.shadowMap.autoUpdate = false;
+dio.renderer.shadowMap.needsUpdate = true; // 触发一次烘焙
 ```
 
 ### 4.3 渲染分辨率 DPR 2 → 1.75
@@ -209,11 +222,11 @@ dio.renderer.shadowMap.needsUpdate = true   // 触发一次烘焙
 
 不同机器差异极大，"最优档"不该由我拍板。在水面调参面板底部加了画质档位（详见 `src/scene/diorama.ts` 的 `QUALITY_PRESETS`）：
 
-| 档位 | DPR | 反射 target | 定位 |
-|---|---|---|---|
-| 流畅 | 1.25 | 384² | 集成显卡 / 高分屏吃力时 |
-| 均衡（默认） | 1.75 | 640² | 大多数桌面 |
-| 清晰 | 2.0 | 896² | 独显 / 追求画质 |
+| 档位         | DPR  | 反射 target | 定位                    |
+| ------------ | ---- | ----------- | ----------------------- |
+| 流畅         | 1.25 | 384²        | 集成显卡 / 高分屏吃力时 |
+| 均衡（默认） | 1.75 | 640²        | 大多数桌面              |
+| 品质         | 2.0  | 896²        | 独显 / 追求画质         |
 
 移动端另有硬上限（DPR 1.5、反射 512²），选择写入 `localStorage`。
 
@@ -225,10 +238,10 @@ dio.renderer.shadowMap.needsUpdate = true   // 触发一次烘焙
 
 用 2.3 节的方法（预热 26 秒后采样 5 秒），在同一台机器上测"旧配置"与"新配置"：
 
-| 配置 | 帧率 |
-|---|---|
-| 旧：MSAA 4× + 每帧阴影 + DPR 2 + 反射 896² | **44.5 fps** |
-| 新：MSAA 2× + 静态阴影 + DPR 1.75 + 反射 640² | **69 fps** |
+| 配置                                          | 帧率         |
+| --------------------------------------------- | ------------ |
+| 旧：MSAA 4× + 每帧阴影 + DPR 2 + 反射 896²    | **44.5 fps** |
+| 新：MSAA 2× + 静态阴影 + DPR 1.75 + 反射 640² | **69 fps**   |
 
 **+55%**（另一轮测量中稳定后曾观测到顶满 120 fps，即 vsync 上限）。
 
@@ -237,11 +250,11 @@ dio.renderer.shadowMap.needsUpdate = true   // 触发一次烘焙
 这些不依赖帧率测量，任何人打开页面都能用控制台验证：
 
 ```js
-const d = window.__DIORAMA
-new URLSearchParams(location.search).get('msaa')  // "2"
-d.renderer.getPixelRatio()                        // 1.75
-d.ground.rt.width                                 // 640
-d.renderer.shadowMap.autoUpdate                   // false
+const d = window.__DIORAMA;
+new URLSearchParams(location.search).get("msaa"); // "2"
+d.renderer.getPixelRatio(); // 1.75
+d.ground.rt.width; // 640
+d.renderer.shadowMap.autoUpdate; // false
 ```
 
 ### 5.3 诚实说明
@@ -264,31 +277,32 @@ d.renderer.shadowMap.autoUpdate                   // false
 
 ## 附录 A · 诊断用 URL 参数速查
 
-可直接用于二分定位问题。下表摘自 bundle 实际读取的参数（`src/scene/diorama.ts` 中对常用项有封装）：
+可直接用于二分定位问题。下表摘自场景源码实际读取的参数（`src/scene/diorama/adapter.ts` 中对常用项有封装）：
 
-| 参数 | 来源 | 作用 |
-|---|---|---|
-| `?nopost` | bundle | 关闭后处理（bloom / 暗角 / 颗粒） |
-| `?msaa=0\|2\|4` | bundle | MSAA 采样数 |
-| `?rtsize=512` | bundle | 平面反射 render target 上限 |
-| `?nopanel` | bundle | 隐藏 bundle 自带面板 |
-| `?t=8` | bundle | 冻结时间，得到完全可复现的静态画面 |
-| `?debug=refl` | bundle | 反射通道可视化；`?dbgr=1` 为调试开关 |
-| `?az=&el=&d=&tx=&ty=&tz=` | bundle | 直接设定机位（与 `src/scene/keyframes.ts` 同一套球坐标） |
-| `?door` / `?nosplash` | bundle | 强制开门 / 关闭雨滴溅落 |
-| `?rip=&wave=&refl=&dark=&spark=&pool=&rain=&expo=` | bundle | 水面与曝光参数的初值（URL 优先于面板设置） |
-| `?skipintro` | **本项目** | 跳过 Loading 最短展示时间（截图 / 测量用） |
+| 参数                                               | 来源       | 作用                                                     |
+| -------------------------------------------------- | ---------- | -------------------------------------------------------- |
+| `?nopost`                                          | 场景源码 | 关闭后处理（bloom / 暗角 / 颗粒）                        |
+| `?msaa=0\|2\|4`                                    | 场景源码     | MSAA 采样数                                              |
+| `?rtsize=512`                                      | 场景源码     | 平面反射 render target 上限                              |
+| `?nopanel`                                         | 场景源码     | 隐藏 bundle 自带面板                                     |
+| `?t=8`                                             | 场景源码     | 冻结时间，得到完全可复现的静态画面                       |
+| `?debug=refl`                                      | 场景源码     | 反射通道可视化；`?dbgr=1` 为调试开关                     |
+| `?az=&el=&d=&tx=&ty=&tz=`                          | 场景源码     | 直接设定机位（与 `src/scene/keyframes.ts` 同一套球坐标） |
+| `?door` / `?nosplash`                              | 场景源码     | 强制开门 / 关闭雨滴溅落                                  |
+| `?rip=&wave=&refl=&dark=&spark=&pool=&rain=&expo=` | 场景源码     | 水面与曝光参数的初值（URL 优先于面板设置）               |
+| `?skipintro`                                       | **本项目** | 跳过 Loading 最短展示时间（截图 / 测量用）               |
 
 完整参数集：`az, d, dark, dbgr, debug, door, el, expo, msaa, nopanel, nopost, nosplash, pool, rain, refl, rip, rtsize, spark, t, tx, ty, tz, wave`
 
 ## 附录 B · 关键文件
 
-| 文件 | 与性能相关的内容 |
-|---|---|
-| `index.html` | 注入 `?msaa=2` 的内联脚本（4.1） |
+| 文件                        | 与性能相关的内容                                                     |
+| --------------------------- | -------------------------------------------------------------------- |
+| `index.html`                | 只剩 canvas + root（早期注入 `?msaa=2` 的脚本已随源码还原移除）       |
 | `src/scene/SceneDriver.tsx` | 静态阴影、画质档位应用、相机分档（`NARRATIVE` / `FREE` / `EXPLORE`） |
-| `src/scene/diorama.ts` | `QUALITY_PRESETS`、参数读写、句柄类型 |
-| `src/_legacy_experience/` | 退役的自研 R3F 实现，其"静态阴影 + 无镜像 pass"正是本次优化的参照 |
+| `src/scene/diorama/index.ts`| `new PostFX(renderer, num('msaa', 2))` —— MSAA 默认值                |
+| `src/scene/diorama/adapter.ts` | `QUALITY_PRESETS`、参数读写、句柄类型                             |
+| `src/_legacy_experience/`   | 退役的自研 R3F 实现，其"静态阴影 + 无镜像 pass"正是本次优化的参照    |
 
 ## 附录 C · 术语
 
