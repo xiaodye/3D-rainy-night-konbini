@@ -1,54 +1,73 @@
-import { useEffect } from 'react'
-import { useExperience } from '../state/store'
+import { useEffect, useState } from "react";
+import { useExperience } from "../state/store";
+import { bootDiorama } from "../scene/diorama";
 
 /**
  * 视角模式切换 — top-right segmented switch between:
  *   「叙事」 the scroll-driven five acts
  *   「360°」 free exploration: drag to rotate, wheel to zoom, right-drag to pan
  *
+ * Also hosts the GLB export button (⤓) and the GitHub repo link.
+ *
  * Keyboard: V toggles, Esc leaves 360° (unless the water panel is open, in
  * which case Esc closes that first — it registers its own handler).
  */
 export default function ViewSwitch() {
-  const sceneReady = useExperience((s) => s.sceneReady)
-  const viewMode = useExperience((s) => s.viewMode)
-  const setViewMode = useExperience((s) => s.setViewMode)
+  const sceneReady = useExperience((s) => s.sceneReady);
+  const viewMode = useExperience((s) => s.viewMode);
+  const setViewMode = useExperience((s) => s.setViewMode);
+  const [exporting, setExporting] = useState(false);
+
+  const onExport = async () => {
+    // idempotent: returns the cached handle once the scene is booted
+    const dio = bootDiorama();
+    if (!dio || exporting) return;
+    setExporting(true);
+    try {
+      const { exportGLB } = await import("../scene/diorama/export");
+      await exportGLB(dio, "rainy-night-konbini.glb");
+    } catch (err) {
+      console.error("[diorama] glb export failed", err);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-      const tag = (e.target as HTMLElement | null)?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      const state = useExperience.getState()
-      if (e.key === 'v' || e.key === 'V') {
-        setViewMode(state.viewMode === 'orbit' ? 'narrative' : 'orbit')
-      } else if (e.key === 'Escape' && !state.waterPanelOpen && state.viewMode === 'orbit') {
-        setViewMode('narrative')
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const state = useExperience.getState();
+      if (e.key === "v" || e.key === "V") {
+        setViewMode(state.viewMode === "orbit" ? "narrative" : "orbit");
+      } else if (e.key === "Escape" && !state.waterPanelOpen && state.viewMode === "orbit") {
+        setViewMode("narrative");
       }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [setViewMode])
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setViewMode]);
 
-  if (!sceneReady) return null
+  if (!sceneReady) return null;
 
   return (
     <div className="view-switch">
       <div className="view-switch-row" role="group" aria-label="视角模式">
         <button
           type="button"
-          className={viewMode === 'narrative' ? 'is-on' : undefined}
-          aria-pressed={viewMode === 'narrative'}
-          onClick={() => setViewMode('narrative')}
+          className={viewMode === "narrative" ? "is-on" : undefined}
+          aria-pressed={viewMode === "narrative"}
+          onClick={() => setViewMode("narrative")}
         >
           叙事
         </button>
         <span className="vs-sep" aria-hidden="true" />
         <button
           type="button"
-          className={viewMode === 'orbit' ? 'is-on' : undefined}
-          aria-pressed={viewMode === 'orbit'}
-          onClick={() => setViewMode('orbit')}
+          className={viewMode === "orbit" ? "is-on" : undefined}
+          aria-pressed={viewMode === "orbit"}
+          onClick={() => setViewMode("orbit")}
         >
           360°
         </button>
@@ -56,6 +75,30 @@ export default function ViewSwitch() {
           V
         </span>
         <span className="vs-sep" aria-hidden="true" />
+        <button
+          type="button"
+          className={`export-link${exporting ? " exporting" : ""}`}
+          onClick={onExport}
+          disabled={exporting}
+          aria-label="导出 GLB 模型"
+          title="导出 GLB 模型"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 3v12" />
+            <path d="m7 10 5 5 5-5" />
+            <path d="M4 21h16" />
+          </svg>
+        </button>
         <a
           className="gh-link"
           href="https://github.com/xiaodye/rainy-night-konbini"
@@ -70,9 +113,7 @@ export default function ViewSwitch() {
         </a>
       </div>
 
-      {viewMode === 'orbit' && (
-        <div className="view-hint">拖拽旋转 · 滚轮缩放 · 右键平移</div>
-      )}
+      {viewMode === "orbit" && <div className="view-hint">拖拽旋转 · 滚轮缩放 · 右键平移</div>}
     </div>
-  )
+  );
 }

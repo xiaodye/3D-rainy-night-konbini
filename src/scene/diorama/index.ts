@@ -271,5 +271,18 @@ export function bootDiorama(): DioramaScene {
   handle = diorama;
   window.__DIORAMA = diorama;
 
+  // ?export=glb — download the whole scene as a binary glTF once the first
+  // frame has rendered (see src/scene/diorama/export.ts)
+  if (qs.has("export")) {
+    const fmt = qs.get("export");
+    const name = "rainy-night-konbini" + (fmt && fmt !== "glb" ? "-" + fmt : "") + ".glb";
+    // defer past the first frame so export happens on a warm scene
+    requestAnimationFrame(() => {
+      import("./export")
+        .then(({ exportGLB }) => exportGLB(diorama, name))
+        .catch((err) => console.error("[diorama] glb export failed", err));
+    });
+  }
+
   return diorama;
 }
