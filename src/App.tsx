@@ -7,8 +7,8 @@ import ViewSwitch from './ui/ViewSwitch'
 export default function App() {
   return (
     <>
-      {/* the WebGL diorama itself is built by /diorama.js and mounts into
-          <canvas id="scene">; SceneDriver only drives its camera */}
+      {/* WebGL diorama 本体由 src/scene/diorama 构建并挂载进
+          <canvas id="scene">；SceneDriver 只负责驱动相机 */}
       <SceneDriver />
       <ScrollNarrative />
       <ViewSwitch />

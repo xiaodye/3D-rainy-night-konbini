@@ -1,19 +1,17 @@
 /*
- * Restored from the bundled diorama (see reference/README.md).
+ * 还原自打包产物 diorama（见 docs/source-restore.md）。
  *
- * This is the original assembly entry point (`src/main.js` in the upstream
- * project), mechanically converted to an ES module. Two deliberate changes
- * compared with the bundle:
+ * 这里是原本的装配入口（上游项目的 `src/main.js`），机械转换为 ES module。
+ * 相较打包版本有两处刻意改动：
  *
- *   1. It exposes `bootDiorama()` instead of running as a side effect of a
- *      <script> tag, so React controls when the scene is created.
- *   2. The upstream project's own tuning panel DOM is gone — our React panel
- *      (src/ui/WaterPanel.tsx) took over. The URL parameters it used to funnel
- *      into the water uniforms are now applied directly, so `?wave=1.4` and
- *      friends still work exactly as before. Its MSAA default is also lowered
- *      from 4 to 2 (see docs/performance-report.md).
+ *   1. 改为暴露 `bootDiorama()`，而不再依赖 <script> 标签的副作用执行，
+ *      于是由 React 决定场景何时创建。
+ *   2. 上游自带的调参面板 DOM 已移除 —— 由我们的 React 面板
+ *      （src/ui/WaterPanel.tsx）接管。过去经它灌进水 uniform 的 URL 参数
+ *      现在直接生效，因此 `?wave=1.4` 之类的用法与从前完全一致。
+ *      MSAA 默认值也从 4 下调为 2（见 docs/performance-report.md）。
  *
- * TYPED ✓ — see docs/source-restore.md.
+ * TYPED ✓ — 见 docs/source-restore.md。
  */
 
 import * as THREE from "three";
@@ -33,19 +31,19 @@ import type { PropsHandle } from "./props";
 import type { RainHandle } from "./rain";
 import type { DioramaHandle } from "./adapter";
 
-// re-export the adapter surface so `from './diorama'` keeps working
+// 再导出 adapter 接口，让 `from './diorama'` 的用法继续可用
 export * from "./adapter";
 
 declare global {
   interface Window {
-    /** published by bootDiorama() for the diagnostic scripts and screenshot tooling */
+    /** 由 bootDiorama() 发布，供诊断脚本与截图工具读取 */
     __DIORAMA?: DioramaScene;
   }
 }
 
 /**
- * Everything a caller (or the diagnostic scripts) may want to poke at.
- * A superset of `DioramaHandle`, which is the minimal surface the UI needs.
+ * 调用方（或诊断脚本）可能想访问的一切。
+ * 是 `DioramaHandle` 的超集 —— 后者是 UI 所需的最小接口。
  */
 export interface DioramaScene extends DioramaHandle {
   scene: THREE.Scene;
@@ -60,19 +58,19 @@ export interface DioramaScene extends DioramaHandle {
 let handle: DioramaScene | null = null;
 
 /**
- * Build the diorama and start its render loop. Idempotent: repeated calls
- * return the same handle (React StrictMode double-mounts effects in dev).
+ * 构建 diorama 并启动渲染循环。幂等：重复调用返回同一个句柄
+ * （React StrictMode 在开发环境会双挂载 effect）。
  *
- * Requires `<canvas id="scene">` to be in the document.
+ * 需要文档中存在 `<canvas id="scene">`。
  */
 export function bootDiorama(): DioramaScene {
   if (handle) return handle;
 
-  // --- query params (debug views / deterministic captures) -------------------
+  // --- URL 查询参数（调试视图 / 确定性截图） --------------------------------
   const qs = new URLSearchParams(location.search);
   const num = (k: string, d: number): number => (qs.has(k) ? parseFloat(qs.get(k) as string) : d);
 
-  // --- renderer --------------------------------------------------------------
+  // --- 渲染器 ----------------------------------------------------------------
   const canvas = document.getElementById("scene") as HTMLCanvasElement;
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -84,12 +82,12 @@ export function bootDiorama(): DioramaScene {
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
   renderer.setSize(innerWidth, innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.NoToneMapping; // graded in the composite pass
+  renderer.toneMapping = THREE.NoToneMapping; // 在合成 pass 里做调色
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.autoClear = true;
 
-  // --- scene -----------------------------------------------------------------
+  // --- 场景 ------------------------------------------------------------------
   const scene = new THREE.Scene();
   const FOG = { color: new THREE.Color(0x0b1220), density: 0.0125 };
   scene.fog = new THREE.FogExp2(FOG.color, FOG.density);
@@ -108,7 +106,7 @@ export function bootDiorama(): DioramaScene {
   controls.maxPolarAngle = 1.47;
   controls.target.set(1.6, 1.05, -1.8);
 
-  // --- lights ----------------------------------------------------------------
+  // --- 灯光 ------------------------------------------------------------------
   const hemi = new THREE.HemisphereLight(0x3f548a, 0x2a2620, 1.45);
   scene.add(hemi);
 
@@ -129,12 +127,12 @@ export function bootDiorama(): DioramaScene {
   moon.shadow.normalBias = 0.035;
   scene.add(moon);
 
-  // a soft warm bounce from the storefront onto the forecourt
+  // 从店面洒向店前场的一道柔和暖色反弹光
   const storeBounce = new THREE.PointLight(0xffd9a0, 11, 22, 2.0);
   storeBounce.position.set(3.6, 2.1, 1.6);
   scene.add(storeBounce);
 
-  // --- world -----------------------------------------------------------------
+  // --- 世界 ------------------------------------------------------------------
   const builder = new Builder();
   const sky = buildSky(scene);
   const { ground } = buildGround(builder, renderer, scene);
@@ -154,15 +152,15 @@ export function bootDiorama(): DioramaScene {
   scene.add(builder.root);
   document.documentElement.setAttribute("data-stats", JSON.stringify({ ...stats, calls: renderer.info.render.calls }));
 
-  // --- post ------------------------------------------------------------------
-  // MSAA 2 instead of the upstream 4: this scene is fill-rate bound and the
-  // composite pass already softens edges. See docs/performance-report.md.
+  // --- 后处理 ----------------------------------------------------------------
+  // MSAA 用 2 而非上游的 4：这个场景 fill-rate 受限，且合成 pass 本就会柔化边缘。
+  // 见 docs/performance-report.md。
   const post = new PostFX(renderer, num("msaa", 2));
 
-  // --- parameter initial values ----------------------------------------------
-  // These used to reach the uniforms through the upstream panel's DOM ranges.
-  // Now they are applied directly — a URL override still wins over the default,
-  // and our React panel reads the resulting live values back out.
+  // --- 参数初值 --------------------------------------------------------------
+  // 这些值过去要经上游面板的 DOM range 才到达 uniform。
+  // 现在直接应用 —— URL 覆盖仍然优先于默认值，
+  // 而我们的 React 面板会把最终生效的活动值读回来。
   ground.uniforms.uWaveScale.value = num("wave", 0.6);
   ground.uniforms.uRipAmp.value = num("rip", 1);
   ground.uniforms.uReflStrength.value = num("refl", 0.85);
@@ -172,7 +170,7 @@ export function bootDiorama(): DioramaScene {
   rain.setAmount(num("rain", 1));
   post.composite.material.uniforms.uExposure.value = num("expo", 1.62);
 
-  // --- camera framing --------------------------------------------------------
+  // --- 相机取景 --------------------------------------------------------------
   function fitCamera(azDeg: number, elDeg: number, dist: number): void {
     const az = THREE.MathUtils.degToRad(azDeg);
     const el = THREE.MathUtils.degToRad(elDeg);
@@ -200,7 +198,7 @@ export function bootDiorama(): DioramaScene {
     fitCamera(DEFAULT_AZ, DEFAULT_EL, defaultDistance());
   }
 
-  // --- resize ----------------------------------------------------------------
+  // --- 尺寸变化 --------------------------------------------------------------
   function resize(): void {
     const w = innerWidth,
       h = innerHeight;
@@ -214,7 +212,7 @@ export function bootDiorama(): DioramaScene {
   addEventListener("resize", resize);
   resize();
 
-  // --- loop ------------------------------------------------------------------
+  // --- 主循环 ----------------------------------------------------------------
   const clock = new THREE.Clock();
   const frozen = qs.has("t");
   let elapsed = 0;
@@ -227,7 +225,7 @@ export function bootDiorama(): DioramaScene {
     sky.update(elapsed, camera);
     ground.update(elapsed);
     if (store.update) store.update(elapsed, dt, camera);
-    // the props tick only depends on time (the extra args were always ignored)
+    // props 的 tick 只依赖时间（多传的参数本来就会被忽略）
     if (props.update) props.update(elapsed);
     if (rain.update) rain.update(elapsed, dt, camera);
 
@@ -250,9 +248,9 @@ export function bootDiorama(): DioramaScene {
   }
   requestAnimationFrame(frame);
 
-  // --- handle ----------------------------------------------------------------
-  // Kept on window as well: the diagnostic scripts in docs/performance-report.md
-  // and the screenshot tooling read it from there.
+  // --- 句柄 ------------------------------------------------------------------
+  // 同时也挂在 window 上：docs/performance-report.md 里的诊断脚本
+  // 与截图工具会从那里读取。
   const diorama: DioramaScene = {
     scene,
     camera,
@@ -271,12 +269,12 @@ export function bootDiorama(): DioramaScene {
   handle = diorama;
   window.__DIORAMA = diorama;
 
-  // ?export=glb — download the whole scene as a binary glTF once the first
-  // frame has rendered (see src/scene/diorama/export.ts)
+  // ?export=glb —— 首帧渲染完成后，把整个场景作为二进制 glTF 下载
+  //（见 src/scene/diorama/export.ts）
   if (qs.has("export")) {
     const fmt = qs.get("export");
     const name = "rainy-night-konbini" + (fmt && fmt !== "glb" ? "-" + fmt : "") + ".glb";
-    // defer past the first frame so export happens on a warm scene
+    // 推迟到首帧之后，保证导出发生在场景已就绪时
     requestAnimationFrame(() => {
       import("./export")
         .then(({ exportGLB }) => exportGLB(diorama, name))

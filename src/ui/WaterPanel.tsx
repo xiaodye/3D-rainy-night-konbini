@@ -13,17 +13,17 @@ import {
 } from '../scene/diorama'
 
 /**
- * 水面调参面板 — rebuilt in React so it belongs to this page's design
- * language (quiet film-caption typography, hairline rules, no glassmorphism
- * glow) instead of the upstream demo's own panel.
+ * 水面调参面板 —— 用 React 重写，以便遵循本页的设计语言
+ * （安静的电影字幕式排版、发丝级分隔线、不用毛玻璃光效），
+ * 而非沿用上游 demo 自带的面板。
  *
- * Sections:
- *  - water: the eight parameters that map 1:1 onto the bundle's water uniforms
- *  - quality: render-resolution preset (the scene is fill-rate bound, so this
- *    is the knob that decides whether it feels smooth on a given machine)
+ * 分区：
+ *  - water：八个参数，与场景的水面 uniform 一一对应
+ *  - quality：渲染分辨率档位（场景 fill-rate 受限，所以在某台机器上
+ *    是否流畅，基本由这个开关决定）
  *
- * Initial values come from the bundle's own hidden `#s-*` ranges, so URL
- * overrides like `?wave=1.4` keep working; localStorage sits underneath them.
+ * 初始值直接来自场景当前生效的 uniform，因此 `?wave=1.4` 这类 URL 覆盖
+ * 依然有效；localStorage 则垫在更下面一层。
  */
 
 const STORAGE_KEY = 'rainy-water-v1'
@@ -34,7 +34,7 @@ function readStoredQuality(): QualityPreset | null {
     const v = localStorage.getItem(QUALITY_KEY)
     if (v === 'smooth' || v === 'balanced' || v === 'sharp') return v
   } catch {
-    /* ignore */
+    /* 忽略 */
   }
   return null
 }
@@ -49,11 +49,11 @@ export default function WaterPanel() {
   const baseline = useRef<Record<WaterKey, number> | null>(null)
   const noPanel = useRef(hasQueryFlag('nopanel'))
 
-  // seed values once the scene is alive
+  // 场景就绪后再灌入初值
   useEffect(() => {
     if (!sceneReady) return
 
-    // quality preset: stored preference wins (applied by SceneDriver)
+    // 画质档位：已存储的偏好优先（由 SceneDriver 应用）
     const stored = readStoredQuality()
     if (stored && stored !== useExperience.getState().qualityPreset) {
       setQualityPreset(stored)
@@ -63,7 +63,7 @@ export default function WaterPanel() {
     const dio = getDiorama()
     const initial = readWaterParams(dio)
 
-    // localStorage fills in params that were NOT overridden by the URL
+    // localStorage 补上那些未被 URL 覆盖的参数
     let saved: Partial<Record<WaterKey, number>> | null = null
     try {
       saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null')
@@ -88,7 +88,7 @@ export default function WaterPanel() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
     } catch {
-      /* private mode — ignore */
+      /* 隐私模式 —— 忽略 */
     }
   }, [])
 
@@ -112,7 +112,7 @@ export default function WaterPanel() {
       try {
         localStorage.setItem(QUALITY_KEY, q)
       } catch {
-        /* ignore */
+        /* 忽略 */
       }
     },
     [setQualityPreset],
@@ -124,7 +124,7 @@ export default function WaterPanel() {
       localStorage.removeItem(STORAGE_KEY)
       localStorage.removeItem(QUALITY_KEY)
     } catch {
-      /* ignore */
+      /* 忽略 */
     }
     const base = baseline.current ?? readWaterParams(dio)
     for (const spec of WATER_PARAMS) applyWaterParam(dio, spec.key, base[spec.key])
@@ -132,7 +132,7 @@ export default function WaterPanel() {
     handleQuality('balanced')
   }, [handleQuality])
 
-  // H toggles / Esc closes
+  // H 切换开关 / Esc 关闭
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
@@ -148,7 +148,7 @@ export default function WaterPanel() {
     return () => window.removeEventListener('keydown', onKey)
   }, [setOpen])
 
-  // once the narrative starts moving, the camera leaves this framing — fold away
+  // 叙事一旦开始推进，相机就会离开这个取景 —— 自动收起
   useEffect(() => {
     return useExperience.subscribe((state, prev) => {
       if (state.scrollProgress > 0.2 && prev.scrollProgress <= 0.2 && state.waterPanelOpen) {

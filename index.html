@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
     <!--
-      NOTE: replace `https://rainy-night-konbini.vercel.app` with the real deployment origin
-      before going live — canonical / og:url / og:image must be absolute URLs for
-      crawlers and social platforms to resolve them.
+      部署域名：canonical / og:url / og:image 必须是绝对地址，
+      爬虫与社交平台才能正确解析。换域名时这几处需同步更新。
     -->
     <title>雨夜便利店街角 · Rainy Night Convenience Store — 交互式 3D 微缩景观</title>
     <meta
@@ -19,7 +18,7 @@
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <link rel="canonical" href="https://rainy-night-konbini.vercel.app" />
 
-    <!-- icons -->
+    <!-- 图标 -->
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="icon" href="/icon-16.png" sizes="16x16" type="image/png" />
@@ -27,7 +26,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
 
-    <!-- open graph -->
+    <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Rainy Night Convenience Store" />
     <meta property="og:title" content="雨夜便利店街角 · 交互式 3D 微缩景观" />
@@ -43,7 +42,7 @@
     <meta property="og:url" content="https://rainy-night-konbini.vercel.app" />
     <meta property="og:locale" content="zh_CN" />
 
-    <!-- twitter / x -->
+    <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="雨夜便利店街角 · 交互式 3D 微缩景观" />
     <meta
@@ -59,7 +58,7 @@
       rel="stylesheet"
     />
 
-    <!-- structured data: this page is a single interactive artwork -->
+    <!-- 结构化数据：本页是一件交互式作品 -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -79,11 +78,11 @@
     </script>
   </head>
   <body>
-    <!-- the page's real heading; visually hidden, but it gives crawlers and
-         assistive tech the subject of a canvas-only page -->
+    <!-- 页面真正的标题；视觉上隐藏，但让爬虫与辅助技术
+         知道这个"只有 canvas"的页面究竟在讲什么 -->
     <h1 class="sr-only">雨夜便利店街角 — Rainy Night Convenience Store</h1>
 
-    <!-- 3D diorama surface; the scene (src/scene/diorama) looks it up by this id -->
+    <!-- 3D diorama 的画布；场景源码（src/scene/diorama）按此 id 查找 -->
     <canvas
       id="scene"
       role="img"
@@ -91,7 +90,7 @@
     ></canvas>
     <div id="vig"></div>
 
-    <!-- HTML narrative / loading / water panel layer -->
+    <!-- HTML 叙事 / 加载 / 水面面板层 -->
     <div id="root"></div>
 
     <noscript>

@@ -3,25 +3,25 @@ import { create } from 'zustand'
 export type Phase = 'loading' | 'entering' | 'ready'
 export type HoverTarget = 'vending' | 'sign' | 'bicycle' | null
 /**
- * 'narrative' — the camera is driven by page scroll (the five acts)
- * 'orbit'     — the user owns the camera: free rotate / zoom / pan
+ * 'narrative' —— 相机由页面滚动驱动（五幕镜头）
+ * 'orbit'     —— 相机归用户：自由旋转 / 缩放 / 平移
  */
 export type ViewMode = 'narrative' | 'orbit'
-/** render resolution preset; see QUALITY_PRESETS in src/scene/diorama.ts */
+/** 渲染分辨率档位；见 src/scene/diorama/adapter.ts 里的 QUALITY_PRESETS */
 export type QualityPreset = 'smooth' | 'balanced' | 'sharp'
 
 interface ExperienceState {
-  /** 0..1 scroll progress through the 5 scenes */
+  /** 贯穿 5 幕的滚动进度，0..1 */
   scrollProgress: number
-  /** 'loading' -> 'entering' (light intro) -> 'ready' */
+  /** 'loading' -> 'entering'（灯光开场）-> 'ready' */
   phase: Phase
-  /** true once the WebGL diorama has rendered its first frames */
+  /** WebGL diorama 渲染出最初几帧后为 true */
   sceneReady: boolean
-  /** water-surface tuning panel expanded? */
+  /** 水面调参面板是否展开 */
   waterPanelOpen: boolean
-  /** which camera mode the page is in */
+  /** 页面当前处于哪种相机模式 */
   viewMode: ViewMode
-  /** render resolution preset (performance ⇄ sharpness) */
+  /** 渲染分辨率档位（性能 ⇄ 清晰度） */
   qualityPreset: QualityPreset
   hovered: HoverTarget
   isMobile: boolean
@@ -58,14 +58,14 @@ export const useExperience = create<ExperienceState>((set) => ({
   setQuality: (isMobile, reducedMotion) => set({ isMobile, reducedMotion }),
 }))
 
-/** Intro light transition progress, driven by Lighting via rAF (non-reactive) */
+/** 开场灯光过渡进度，由 Lighting 经 rAF 驱动（非响应式） */
 export const introState = {
   /** 0..1 */
   progress: 0,
   started: false,
 }
 
-/** Global bus for spawning puddle ripples from anywhere (drips, rain hits) */
+/** 全局总线：可从任意位置生成水洼涟漪（滴水、雨点落地） */
 export const rippleBus = {
   spawn: null as null | ((x: number, z: number, strength?: number) => void),
 }

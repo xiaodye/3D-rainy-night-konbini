@@ -3,15 +3,13 @@ import { useExperience } from '../state/store'
 import { hasQueryFlag } from '../scene/diorama'
 
 /**
- * Minimal loading screen: deep navy, "RAINY NIGHT / LOADING 43%",
- * 1px progress line. No spinner.
+ * 极简加载页：深藏青底、"RAINY NIGHT / LOADING 43%"、1px 进度线。没有转圈图标。
  *
- * Progress semantics: font readiness + `sceneReady` (set by SceneDriver once
- * the bundle is up AND has actually rendered a frame, i.e.
- * `window.__DIORAMA.renderer.info.render.calls > 0`) + a minimum presentation
- * time so the title reads. Then it fades out and the scene is revealed.
+ * 进度语义：字体就绪 + `sceneReady`（由 SceneDriver 设置 —— 场景已启动
+ * 且确实渲染出了一帧，即 `window.__DIORAMA.renderer.info.render.calls > 0`）
+ * + 一个最短展示时长，保证标题能被看清。随后淡出，露出场景。
  *
- * `?skipintro` drops the minimum dwell time to 0 — handy for screenshot runs.
+ * `?skipintro` 把最短停留时间降到 0 —— 跑截图时很方便。
  */
 export default function LoadingScreen() {
   const [progress, setProgress] = useState(0)
@@ -24,7 +22,7 @@ export default function LoadingScreen() {
     const started = performance.now()
     let raf: number
 
-    // font readiness with a hard 3s fallback — never block the intro
+    // 字体就绪，并带 3 秒硬兜底 —— 绝不卡住开场
     let fontsReady = false
     if (document.fonts) {
       document.fonts.ready.then(() => (fontsReady = true))
@@ -33,12 +31,12 @@ export default function LoadingScreen() {
       fontsReady = true
     }
 
-    // minimum dwell time (readability); `?skipintro` collapses it for captures
+    // 最短停留时间（关乎可读性）；`?skipintro` 会把它压到极短，便于截图
     const minSeconds = hasQueryFlag('skipintro') ? 0.05 : 1.6
 
     const tick = () => {
       const elapsed = (performance.now() - started) / 1000
-      // ease toward 100 over ~1.6s, tiny pauses for texture
+      // 约 1.6 秒内缓动到 100，夹杂细微停顿以增加质感
       const t = Math.min(1, elapsed / minSeconds)
       const eased = 1 - Math.pow(1 - t, 2.2)
       const jitter = t < 1 ? Math.sin(elapsed * 9) * 1.5 : 0

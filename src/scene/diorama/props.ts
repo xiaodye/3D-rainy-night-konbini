@@ -1,11 +1,10 @@
 /*
- * Restored from the bundled diorama (see reference/README.md).
+ * 还原自打包产物 diorama（见 docs/source-restore.md）。
  *
- * Mechanically converted back to source: the original module had the same
- * structure, this file just swaps the `window.__M` namespace wiring for ES
- * module imports/exports. The rendering logic itself is unchanged.
+ * 机械转换回源码：原模块结构相同，本文件只是把 `window.__M` 命名空间
+ * 接线换成 ES module 的 import/export，渲染逻辑本身未改动。
  *
- * TYPED ✓ — see docs/source-restore.md.
+ * TYPED ✓ — 见 docs/source-restore.md。
  */
 
 import * as THREE from 'three'
@@ -16,18 +15,18 @@ import type { Vec3 } from './toon'
 import type { WetGround } from './ground'
 
 // ---------------------------------------------------------------------------
-// Everything around the store: vending machines, bicycles, poles and wires,
-// street lamps, signals, guardrails, signs, bins, the alley and the two
-// neighbouring buildings that frame the corner.
+// 便利店周边的一切：自动贩卖机、自行车、电线杆与电线、
+// 路灯、信号灯、护栏、路牌、垃圾桶、后巷，
+// 以及框住这个街角的两栋邻居楼。
 // ---------------------------------------------------------------------------
 
-/** a fresh canvas plus its 2d context */
+/** 一块新画布及其 2d context */
 function cvs(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   return [c, c.getContext('2d')!];
 }
-/** canvas -> sRGB texture with anisotropy (all our props textures are painted) */
+/** canvas -> 带各向异性的 sRGB 贴图（本项目道具贴图全部为手绘） */
 function tex(c: HTMLCanvasElement): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -50,7 +49,7 @@ function roundRect(
   g.closePath();
 }
 
-// --- vending machine front ---------------------------------------------------
+// --- 自动贩卖机正面 ---------------------------------------------------------
 function vendingTexture(accent = '#d93b3b'): THREE.CanvasTexture {
   const W = 256, Hh = 512;
   const [c, g] = cvs(W, Hh);
@@ -60,7 +59,7 @@ function vendingTexture(accent = '#d93b3b'): THREE.CanvasTexture {
   g.font = `bold 46px ${JP}`;
   g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillText('つめたい', W / 2, 46);
-  // product rows behind glass
+  // 玻璃后的商品排
   const rng = makeRng(31);
   const pal = ['#e8543f', '#f2a03d', '#4fb06d', '#3f8fe8', '#d94f9a', '#5ad0c0', '#f7d94c'];
   for (let r = 0; r < 3; r++) {
@@ -77,7 +76,7 @@ function vendingTexture(accent = '#d93b3b'): THREE.CanvasTexture {
       g.fillRect(x + 6, y + 34, 20, 8);
     }
   }
-  // price strip
+  // 价格条
   g.fillStyle = '#ffffff'; g.fillRect(0, 452, W, 60);
   g.fillStyle = '#1b2b52';
   g.font = `bold 34px ${EN}`;
@@ -85,15 +84,15 @@ function vendingTexture(accent = '#d93b3b'): THREE.CanvasTexture {
   return tex(c);
 }
 
-// --- building facade ---------------------------------------------------------
-/** options for the painted building facades */
+// --- 建筑立面 ---------------------------------------------------------------
+/** 手绘建筑立面的选项 */
 export interface FacadeOpts {
   w?: number
   h?: number
   floors?: number
   base?: string
   win?: string
-  /** 0–1, share of windows that are lit */
+  /** 0–1，亮灯窗户的比例 */
   lit?: number
   seed?: number
   shopfront?: boolean
@@ -105,7 +104,7 @@ function facadeTexture(
   const [c, g] = cvs(w, h);
   const rng = makeRng(seed);
   g.fillStyle = base; g.fillRect(0, 0, w, h);
-  // tile texture
+  // 瓷砖纹理
   for (let i = 0; i < 4000; i++) {
     g.fillStyle = rng() > 0.5 ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)';
     g.fillRect(rng() * w, rng() * h, 3, 3);
@@ -113,13 +112,13 @@ function facadeTexture(
   const fh = h / floors;
   for (let f = 0; f < floors; f++) {
     const y0 = f * fh;
-    // floor separation band
+    // 楼层分隔带
     g.fillStyle = 'rgba(0,0,0,0.22)';
     g.fillRect(0, y0 + fh - 8, w, 8);
     g.fillStyle = 'rgba(255,255,255,0.05)';
     g.fillRect(0, y0 + fh - 14, w, 5);
     if (shopfront && f === floors - 1) continue;
-    // windows
+    // 窗户
     const cols = Math.max(2, Math.round(w / 150));
     const ww = (w / cols) * 0.52;
     for (let i = 0; i < cols; i++) {
@@ -139,17 +138,17 @@ function facadeTexture(
       }
       g.fillRect(x, wy, ww, wh);
       if (on) {
-        // curtain / sill silhouette
+        // 窗帘 / 窗台剪影
         g.fillStyle = 'rgba(120,90,60,0.35)';
         g.fillRect(x, wy, ww, wh * (0.18 + rng() * 0.3));
       }
-      // frame mullion
+      // 窗框中梃
       g.fillStyle = 'rgba(20,24,32,0.7)';
       g.fillRect(x + ww / 2 - 2, wy, 4, wh);
       g.fillStyle = 'rgba(150,160,180,0.25)';
       g.fillRect(x - 5, wy + wh + 2, ww + 10, 5);
     }
-    // balcony rail on some floors
+    // 部分楼层的阳台栏杆
     if (f % 2 === 1) {
       g.fillStyle = 'rgba(30,34,44,0.75)';
       g.fillRect(0, y0 + fh * 0.72, w, fh * 0.16);
@@ -157,14 +156,14 @@ function facadeTexture(
       for (let x = 0; x < w; x += 12) g.fillRect(x, y0 + fh * 0.72, 3, fh * 0.16);
     }
   }
-  // drain pipes
+  // 落水管
   for (const x of [0.06, 0.52, 0.94]) {
     g.fillStyle = 'rgba(24,28,36,0.8)';
     g.fillRect(w * x, 0, 12, h);
     g.fillStyle = 'rgba(140,150,170,0.2)';
     g.fillRect(w * x, 0, 3, h);
   }
-  // rain stains
+  // 雨水污痕
   for (let i = 0; i < 26; i++) {
     const x = rng() * w, ww = 8 + rng() * 40, y = rng() * h * 0.6;
     const grd = g.createLinearGradient(0, y, 0, y + h * 0.5);
@@ -176,7 +175,7 @@ function facadeTexture(
   return tex(c);
 }
 
-// --- signs -------------------------------------------------------------------
+// --- 路牌 -------------------------------------------------------------------
 function roadSignTexture(text: string, sub: string, bg = '#2f6fe0'): THREE.CanvasTexture {
   const W = 512, Hh = 192;
   const [c, g] = cvs(W, Hh);
@@ -224,22 +223,22 @@ function shutterTexture(): THREE.CanvasTexture {
 }
 
 // ---------------------------------------------------------------------------
-/** what the props module needs from its caller */
+/** props 模块需要调用方提供的东西 */
 export interface PropsCtx {
   ground?: WetGround
 }
 
-/** animated state the props module keeps alive between frames */
+/** props 模块在帧间维持的动画状态 */
 interface PropDynamics {
-  /** traffic signals; the lit lamp cycles with time */
+  /** 交通信号灯；亮起的那颗随时间循环 */
   signals: { lamps: THREE.MeshBasicMaterial[]; cols: number[]; offset: number }[]
-  /** emissive materials that flicker (shop signs, vending faces) */
+  /** 闪烁的自发光材质（店招、贩卖机面板） */
   flickers: THREE.MeshBasicMaterial[]
-  /** lamp halo meshes whose opacity breathes */
+  /** 路灯的 halo mesh，透明度会轻微呼吸 */
   lamps: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>[]
 }
 
-/** the props group plus its per-frame tick */
+/** props 的 group 及其每帧 tick */
 export interface PropsHandle {
   group: THREE.Group
   update(t: number): void
@@ -272,24 +271,24 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
     binBody: toon(0x4f5666),
   };
 
-  // vending machines
+  // 自动贩卖机
   function vending(x: number, z: number, rotY: number, accent: string) {
     const t = vendingTexture(accent);
     const face = glow(0xffffff, 1.12, { map: t });
     dyn.flickers.push(face);
     const w = 1.05, d = 0.72, h = 1.92;
-    // body
+    // 机身
     builder.box(w, h, d, M.white, { pos: [x, h / 2, z], rot: [0, rotY, 0], outline: 1.1 });
     const fwd = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY));
     const px = x + fwd.x * (d / 2 + 0.012), pz = z + fwd.z * (d / 2 + 0.012);
     builder.plane(w - 0.06, h - 0.08, face, { pos: [px, h / 2 + 0.02, pz], rot: [0, rotY, 0] });
-    // base + top cap
+    // 底座 + 顶盖
     builder.box(w + 0.05, 0.12, d + 0.05, M.metalDark, { pos: [x, 0.06, z], rot: [0, rotY, 0], outline: 0.9 });
     builder.box(w + 0.05, 0.08, d + 0.05, M.metalDark, { pos: [x, h - 0.02, z], rot: [0, rotY, 0], outline: 0.9 });
-    // coin slot panel
+    // 投币面板
     const sx = x + fwd.x * (d / 2 + 0.05), sz = z + fwd.z * (d / 2 + 0.05);
     builder.box(0.16, 0.3, 0.06, M.metalDark, { pos: [sx + fwd.z * 0.36, 1.15, sz - fwd.x * 0.36], rot: [0, rotY, 0], outline: 0.7 });
-    // glow card
+    // 发光卡片
     const card = new THREE.Mesh(new THREE.PlaneGeometry(w * 2.2, h * 1.5), additive(0xfff0d0, 0.7, { map: glowTexture() }));
     card.position.set(x + fwd.x * 0.42, h * 0.5, z + fwd.z * 0.42);
     card.rotation.y = rotY;
@@ -301,22 +300,22 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
   vending(-9.05, -4.6, Math.PI / 2, '#2f6fe0');
   vending(11.9, -0.2, Math.PI, '#27b07a');
 
-  // bicycles
+  // 自行车
   function bicycle(x: number, z: number, rotY: number, frameCol: number) {
     const F = toon(frameCol);
     const R = 0.325;
     const cos = Math.cos(rotY), sin = Math.sin(rotY);
-    // local (along the frame, up, sideways) -> world
+    // 车体局部坐标（沿车身、向上、侧向）-> 世界坐标
     const P = (dx: number, dy: number, dz: number): Vec3 =>
       [x + dx * cos + dz * sin, dy, z - dx * sin + dz * cos];
-    const WR: Vec3 = [0, rotY, 0]; // wheel plane: axis runs across the frame
+    const WR: Vec3 = [0, rotY, 0]; // 车轮平面：轴线横穿车身
 
-    // --- wheels: tyre + rim + spokes, no solid disc -------------------------
+    // --- 车轮：轮胎 + 轮圈 + 辐条，不用实心圆盘 ------------------------------
     for (const dx of [-0.52, 0.52]) {
       const p = P(dx, R, 0);
       builder.add(builder.torusGeo(R, 0.036, 18, 8), M.rubber, { pos: p, rot: WR, outline: 0.6 });
       builder.add(builder.torusGeo(R - 0.052, 0.018, 18, 6), M.steel, { pos: p, rot: WR, outline: 0.4 });
-      builder.box(0.05, 0.05, 0.1, M.steel, { pos: p, rot: WR, outline: 0.4 }); // hub
+      builder.box(0.05, 0.05, 0.1, M.steel, { pos: p, rot: WR, outline: 0.4 }); // 轮毂
       for (let s = 0; s < 3; s++) {
         const a = (s / 3) * Math.PI;
         builder.box(R * 1.85, 0.013, 0.013, M.steel, {
@@ -325,7 +324,7 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
       }
     }
 
-    // --- frame --------------------------------------------------------------
+    // --- 车架 ----------------------------------------------------------------
     const tube = (a: Vec3, b: Vec3, r = 0.022) => {
       const pa = new THREE.Vector3(...a), pb = new THREE.Vector3(...b);
       const mid = pa.clone().add(pb).multiplyScalar(0.5);
@@ -337,85 +336,85 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
     };
     const rear = P(-0.52, R, 0), front = P(0.52, R, 0);
     const crank = P(-0.06, 0.3, 0), seatTop = P(-0.11, 0.72, 0), headTop = P(0.3, 0.78, 0);
-    tube(rear, crank, 0.024);        // chain stay
-    tube(rear, seatTop, 0.022);      // seat stay
-    tube(crank, seatTop, 0.026);     // seat tube
-    tube(crank, headTop, 0.026);     // down tube
-    tube(seatTop, headTop, 0.024);   // top tube
-    tube(headTop, front, 0.022);     // fork
-    tube(P(0.3, 0.78, 0), P(0.36, 0.9, 0), 0.02); // stem
-    tube(P(-0.52, R, 0), P(-0.52, 0.62, 0), 0.018); // seat post rear
-    tube(P(-0.52, 0.62, 0), P(-0.14, 0.62, 0), 0.016); // rear rack
+    tube(rear, crank, 0.024);        // 后下叉
+    tube(rear, seatTop, 0.022);      // 后上叉
+    tube(crank, seatTop, 0.026);     // 座管
+    tube(crank, headTop, 0.026);     // 下管
+    tube(seatTop, headTop, 0.024);   // 上管
+    tube(headTop, front, 0.022);     // 前叉
+    tube(P(0.3, 0.78, 0), P(0.36, 0.9, 0), 0.02); // 把立
+    tube(P(-0.52, R, 0), P(-0.52, 0.62, 0), 0.018); // 后座管
+    tube(P(-0.52, 0.62, 0), P(-0.14, 0.62, 0), 0.016); // 后货架
 
-    // handlebar
+    // 车把
     builder.cyl(0.017, 0.017, 0.44, 8, M.steel, { pos: P(0.36, 0.9, 0), rot: [Math.PI / 2, 0, rotY], outline: 0.5 });
     for (const dz of [-0.19, 0.19]) {
       builder.cyl(0.025, 0.025, 0.1, 8, M.rubber, { pos: P(0.36, 0.9, dz), rot: [Math.PI / 2, 0, rotY], outline: 0.4 });
     }
-    // saddle
+    // 车座
     builder.box(0.26, 0.055, 0.11, M.rubber, { pos: P(-0.13, 0.76, 0), rot: [0, rotY, 0], outline: 0.6 });
     builder.cyl(0.02, 0.02, 0.14, 6, M.steel, { pos: P(-0.12, 0.69, 0), outline: 0.4 });
-    // front basket (dark body with a wire rim and floor)
+    // 前车筐（深色筐体 + 金属圈口与筐底）
     const fenderMat = toon(0x7b828e, { ramp: 3 });
     const bk = P(0.47, 0.58, 0);
     builder.box(0.25, 0.19, 0.21, toon(0x2f353f, { ramp: 2 }), { pos: bk, rot: [0, rotY, 0], outline: 0.4 });
     builder.box(0.27, 0.022, 0.23, fenderMat, { pos: [bk[0], bk[1] + 0.1, bk[2]], rot: [0, rotY, 0], outline: 0.5 });
     builder.box(0.27, 0.022, 0.23, fenderMat, { pos: [bk[0], bk[1] - 0.095, bk[2]], rot: [0, rotY, 0], outline: 0.5 });
-    // basket stay to the fork
+    // 车筐与前叉之间的支撑
     builder.cyl(0.014, 0.014, 0.2, 6, M.steel, { pos: P(0.5, 0.44, 0), outline: 0.4 });
-    // fenders over both wheels (thin, mid grey, hugging the tyre)
+    // 前后挡泥板（薄、中灰、贴着轮胎）
     for (const dx of [-0.52, 0.52]) {
       builder.add(new THREE.TorusGeometry(R + 0.052, 0.011, 6, 14, Math.PI * 1.05), fenderMat, {
         pos: P(dx, R, 0), rot: [0, rotY, 0.28], outline: 0.4,
       });
     }
-    // chainring + chain
+    // 牙盘 + 链条
     builder.box(0.17, 0.17, 0.022, M.steel, { pos: P(-0.06, 0.3, 0.05), rot: [0, rotY, 0], outline: 0.4 });
     builder.box(0.5, 0.022, 0.016, M.metalDark, {
       pos: P(-0.29, 0.31, 0.05), rot: [0, rotY, 0.05], outline: 0.3,
     });
-    // pedals + crank
+    // 脚踏 + 曲柄
     builder.cyl(0.05, 0.05, 0.06, 8, M.steel, { pos: crank, rot: [0, 0, Math.PI / 2], outline: 0.4 });
     for (const s of [-1, 1]) {
       builder.box(0.1, 0.02, 0.05, M.rubber, {
         pos: P(-0.06 + s * 0.12, 0.3 + s * 0.12, 0.08 * s), rot: [0, rotY, 0], outline: 0.4,
       });
     }
-    // kickstand
+    // 脚撑
     builder.cyl(0.015, 0.015, 0.3, 6, M.steel, { pos: P(-0.2, 0.16, 0.13), rot: [0.3, rotY, 0.18], outline: 0.4 });
   }
   bicycle(-2.9, -5.4, 0.32, 0x3d4a63);
   bicycle(-2.75, -6.5, 0.18, 0x6a4a52);
   bicycle(7.15, 2.3, -0.5, 0x2f4a52);
 
-  // bike rack
+  // 自行车停放架
   for (let i = 0; i < 4; i++) {
     const x = -3.05, z = -5.0 - i * 0.62;
     builder.cyl(0.03, 0.03, 0.62, 8, M.steel, { pos: [x, 0.31, z], outline: 0.6 });
-    // (upstream passed a 5th `arc` argument that torusGeo never accepted)
+    // （上游多传了一个 `arc` 参数，而 torusGeo 从不接受它）
     builder.add(builder.torusGeo(0.16, 0.022, 10, 6), M.steel, {
       pos: [x, 0.62, z], rot: [0, 0, 0], outline: 0.5,
     });
   }
 
-  // bins, umbrella stand, sandwich board
+  // 垃圾桶、伞架、A 字招牌
   function bin(x: number, z: number, rotY: number, label: string) {
     const fwd = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY));
     builder.box(0.52, 0.78, 0.46, M.binBody, { pos: [x, 0.39, z], rot: [0, rotY, 0], outline: 1.1 });
-    // lid with a slot
+    // 带投口的桶盖
     builder.box(0.56, 0.12, 0.5, M.metalDark, { pos: [x, 0.84, z], rot: [0, rotY, 0], outline: 0.9 });
     builder.box(0.3, 0.04, 0.12, M.metal, {
       pos: [x + fwd.x * 0.2, 0.9, z + fwd.z * 0.2], rot: [0, rotY, 0], outline: 0.4,
     });
-    // recycling label
+    // 回收标识
     builder.box(0.34, 0.24, 0.03, label === 'pet' ? M.blue : M.metal, {
       pos: [x + fwd.x * 0.245, 0.6, z + fwd.z * 0.245], rot: [0, rotY, 0], outline: 0.5,
     });
-    // opening
+    // 投入口
     builder.box(0.3, 0.2, 0.05, M.metalDark, {
       pos: [x + fwd.x * 0.25, 0.38, z + fwd.z * 0.25], rot: [0, rotY, 0], outline: 0.5,
     });
-    // feet
+    // 支脚
     for (const s of [-1, 1]) {
       builder.box(0.08, 0.06, 0.08, M.metalDark, {
         pos: [x + fwd.z * 0.18 * s, 0.03, z - fwd.x * 0.18 * s], rot: [0, rotY, 0], outline: 0.4,
@@ -426,7 +425,7 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
   bin(5.25, 0.15, 0, 'can');
   bin(-2.5, -0.05, Math.PI / 2, 'pet');
 
-  // umbrella stand outside the door
+  // 门外的伞架
   builder.cyl(0.2, 0.16, 0.68, 14, M.metal, { pos: [1.15, 0.34, 0.28], outline: 1.1 });
   for (let i = 0; i < 5; i++) {
     const a = i * 1.27;
@@ -437,7 +436,7 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
     });
   }
 
-  // A-frame sandwich board
+  // A 字型广告牌
   (() => {
     const x = 6.05, z = 0.5, rot = -0.35;
     builder.box(0.62, 0.9, 0.05, M.white, { pos: [x, 0.52, z], rot: [0.2, rot, 0], outline: 0.9 });
@@ -445,7 +444,7 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
     builder.box(0.5, 0.12, 0.03, M.blue, { pos: [x + 0.03, 0.78, z], rot: [0.2, rot, 0], outline: 0.4 });
   })();
 
-  // street lamps, utility poles, wires
+  // 路灯、电线杆、电线
   const wireMat = toon(0x151820);
   function wire(a: Vec3, b: Vec3, sag = 0.5, r = 0.016) {
     const mid = new THREE.Vector3((a[0] + b[0]) / 2, Math.min(a[1], b[1]) - sag, (a[2] + b[2]) / 2);
@@ -458,17 +457,17 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
 
   function pole(x: number, z: number, h = 8.4): { x: number; z: number; h: number } {
     builder.cyl(0.13, 0.17, h, 10, M.concrete, { pos: [x, h / 2, z], outline: 1.1 });
-    // crossarms
+    // 横担
     for (const [y, w] of [[h - 0.55, 1.5], [h - 1.15, 1.2]]) {
       builder.box(w, 0.09, 0.09, M.concreteDark, { pos: [x, y, z], outline: 0.8 });
       for (const dx of [-w / 2 + 0.12, w / 2 - 0.12]) {
         builder.cyl(0.05, 0.05, 0.16, 8, M.steel, { pos: [x + dx, y + 0.14, z], outline: 0.5 });
       }
     }
-    // transformer
+    // 变压器
     builder.cyl(0.24, 0.24, 0.62, 12, M.steel, { pos: [x + 0.34, h - 2.3, z], outline: 1.1 });
     builder.cyl(0.26, 0.26, 0.06, 12, M.metalDark, { pos: [x + 0.34, h - 1.97, z], outline: 0.7 });
-    // small lamp arm
+    // 小灯臂
     builder.cyl(0.05, 0.05, 0.9, 8, M.metalDark, { pos: [x - 0.45, h - 1.9, z], rot: [0, 0, Math.PI / 2], outline: 0.6 });
     builder.box(0.34, 0.12, 0.24, M.metalDark, { pos: [x - 0.88, h - 2.0, z], outline: 0.8 });
     builder.box(0.3, 0.05, 0.2, M.lampGlow, { pos: [x - 0.88, h - 2.08, z], outline: 0 });
@@ -479,7 +478,7 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
   const p2 = pole(1.4, 12.4, 8.4);
   const p3 = pole(-6.9, -11.6, 7.6);
   const p4 = pole(12.5, 4.1, 7.2);
-  // wire spans
+  // 跨接的电线
   wire([p1.x - 0.6, p1.h - 0.55, p1.z], [p2.x - 0.6, p2.h - 0.55, p2.z], 1.5);
   wire([p1.x - 0.6, p1.h - 1.15, p1.z], [p2.x - 0.6, p2.h - 1.15, p2.z], 1.7);
   wire([p1.x + 0.6, p1.h - 0.55, p1.z], [p2.x + 0.6, p2.h - 0.55, p2.z], 1.5);
@@ -488,10 +487,10 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
   wire([p1.x, p1.h - 3.0, p1.z], [p3.x, p3.h - 1.8, p3.z], 2.1, 0.02);
   wire([p4.x, p4.h - 1.1, p4.z], [p2.x + 0.4, p2.h - 1.9, p2.z], 1.3, 0.018);
   wire([p4.x, p4.h - 1.5, p4.z], [p2.x + 0.4, p2.h - 2.3, p2.z], 1.4, 0.018);
-  // drop line into the store
+  // 引入店内的下户线
   wire([p4.x, p4.h - 1.2, p4.z], [9.0, 4.4, -1.2], 0.5, 0.02);
 
-  // street lamp on the sidewalk
+  // 人行道上的路灯
   function streetLamp(x: number, z: number, rotY = 0, h = 5.2) {
     builder.cyl(0.09, 0.12, h, 10, M.metalDark, { pos: [x, h / 2, z], outline: 1.1 });
     builder.box(0.4, 0.16, 0.4, M.metalDark, { pos: [x, 0.08, z], outline: 0.9 });
@@ -501,7 +500,7 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
     });
     builder.cyl(0.3, 0.16, 0.26, 12, M.metalDark, { pos: [x + armX * 1.0, h - 0.2, z + armZ * 1.0], outline: 1.0 });
     builder.cyl(0.24, 0.24, 0.06, 12, M.lampGlow, { pos: [x + armX * 1.0, h - 0.33, z + armZ * 1.0], outline: 0 });
-    // halo
+    // 光晕
     const halo = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 2.8), additive(0xffd9a0, 0.55, { map: glowTexture() }));
     halo.position.set(x + armX * 1.0, h - 0.4, z + armZ * 1.0);
     halo.renderOrder = 4;
@@ -517,7 +516,7 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
   streetLamp(11.4, -6.4, -Math.PI * 0.6, 4.4);
   streetLamp(12.2, 12.0, -Math.PI * 0.35, 5.0);
 
-  // traffic signals
+  // 交通信号灯
   function signalHead(x: number, y: number, z: number, rotY: number, scale = 1) {
     const g = new THREE.Group();
     g.position.set(x, y, z);
@@ -540,19 +539,19 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
     dyn.signals.push({ lamps, cols, offset: rng() * 6 });
     return g;
   }
-  // junction signal on a pole
+  // 杆上的路口信号灯
   builder.cyl(0.1, 0.12, 5.0, 10, M.metalDark, { pos: [-5.35, 2.5, 10.55], outline: 1.1 });
   signalHead(-5.35, 4.9, 10.3, 0, 1);
-  // pedestrian signal
+  // 行人信号灯
   builder.box(0.26, 0.5, 0.2, M.metalDark, { pos: [-5.35, 3.2, 10.42], outline: 0.9 });
   builder.box(0.18, 0.18, 0.03, glow(0xff5a4d, 1.2), { pos: [-5.35, 3.32, 10.31], outline: 0 });
   builder.box(0.18, 0.18, 0.03, toon(0x1c2028), { pos: [-5.35, 3.08, 10.31], outline: 0 });
-  // distant signal at the far end of the main street
+  // 主街远端的信号灯
   builder.cyl(0.08, 0.1, 4.4, 8, M.metalDark, { pos: [-12.3, 2.2, 5.15], outline: 1.0 });
   signalHead(-12.3, 4.3, 5.4, 0.5, 0.85);
 
-  // guardrail, signs, hydrant, post box, planters
-  // guardrail along the south sidewalk
+  // 护栏、路牌、消防栓、邮筒、花箱
+  // 沿南侧人行道的护栏
   const gz = 11.55;
   for (let x = -7.4; x <= -0.4; x += 1.4) {
     builder.cyl(0.045, 0.05, 0.86, 8, M.steel, { pos: [x, 0.43, gz], outline: 0.6 });
@@ -563,20 +562,20 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
   builder.cyl(0.045, 0.05, 0.86, 8, M.steel, { pos: [-7.4, 0.43, gz], outline: 0.6 });
   builder.cyl(0.045, 0.05, 0.86, 8, M.steel, { pos: [-0.4, 0.43, gz], outline: 0.6 });
 
-  // road name sign on a pole
+  // 杆上的路名牌
   (() => {
     const t = roadSignTexture('桜町 3', 'SAKURA-CHO 3', '#2f6fe0');
     builder.cyl(0.05, 0.06, 2.7, 8, M.steel, { pos: [-4.7, 1.35, 11.9], outline: 0.7 });
     builder.plane(1.25, 0.47, glow(0xffffff, 1.0, { map: t }), { pos: [-4.7, 2.45, 11.95] });
     builder.plane(1.25, 0.47, glow(0xffffff, 1.0, { map: t }), { pos: [-4.7, 2.45, 11.85], rot: [0, Math.PI, 0] });
   })();
-  // give-way sign at the side street
+  // 侧街的让行标志
   (() => {
     const t = roadSignTexture('止まれ', 'STOP', '#c8342f');
     builder.cyl(0.05, 0.06, 2.6, 8, M.steel, { pos: [-5.35, 1.3, 5.6], outline: 0.7 });
     builder.plane(1.0, 0.38, glow(0xffffff, 1.0, { map: t }), { pos: [-5.35, 2.4, 5.65] });
   })();
-  // convex traffic mirror at the corner
+  // 街角的凸面交通镜
   (() => {
     builder.cyl(0.05, 0.06, 3.0, 8, M.steel, { pos: [-9.85, 1.5, 3.9], outline: 0.7 });
     builder.add(new THREE.SphereGeometry(0.44, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.42), toon(0xbfd4e8, { ramp: 3 }), {
@@ -586,7 +585,7 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
       pos: [-9.85, 2.95, 3.9], rot: [Math.PI * 0.62, 0.5, 0], outline: 0.6,
     });
   })();
-  // fire hydrant
+  // 消防栓
   (() => {
     const x = 8.0, z = 11.8;
     builder.cyl(0.14, 0.17, 0.5, 12, toon(0xc23a35), { pos: [x, 0.25, z], outline: 1.0 });
@@ -594,7 +593,7 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
     builder.add(builder.sphereGeo(0.11, 12), toon(0xd8483f), { pos: [x, 0.74, z], outline: 1.0 });
     builder.cyl(0.05, 0.05, 0.3, 8, M.metalDark, { pos: [x, 0.45, z], rot: [0, 0, Math.PI / 2], outline: 0.6 });
   })();
-  // Japanese post box
+  // 日式邮筒
   (() => {
     const x = 2.6, z = 12.0;
     builder.cyl(0.19, 0.2, 0.9, 14, toon(0xc8342f), { pos: [x, 0.75, z], outline: 1.1 });
@@ -605,23 +604,23 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
     builder.cyl(0.05, 0.06, 0.3, 8, M.metalDark, { pos: [x, 0.15, z], outline: 0.6 });
     builder.cyl(0.2, 0.2, 0.04, 14, M.metalDark, { pos: [x, 1.32, z], outline: 0.5 });
   })();
-  // planters with clipped shrubs
+  // 修剪过的灌木花箱
   for (const [x, z] of [[-8.6, 12.2], [-11.6, 12.2], [-3.1, 12.2]]) {
     builder.box(0.9, 0.42, 0.9, toon(0x6d6a63, { ramp: 3 }), { pos: [x, 0.36, z], outline: 1.0 });
     builder.add(builder.sphereGeo(0.44, 10), M.foliage, { pos: [x, 0.86, z], scale: [1, 0.86, 1], outline: 1.1 });
     builder.add(builder.sphereGeo(0.3, 10), M.foliageLit, { pos: [x + 0.16, 1.02, z - 0.1], outline: 1.0 });
   }
 
-  // bulletin board + neighbour walls
+  // 公告板 + 邻居楼的墙面
   (() => {
     const t = boardTexture();
-    // on the store's west wall, beside the vending machine
+    // 装在便利店西墙、贩卖机旁边
     builder.box(1.7, 1.25, 0.09, M.wood, { pos: [-1.12, 1.9, -5.4], rot: [0, -Math.PI / 2, 0], outline: 1.0 });
     builder.plane(1.56, 1.1, glow(0xffffff, 0.92, { map: t }), { pos: [-1.19, 1.9, -5.4], rot: [0, -Math.PI / 2, 0] });
     builder.box(1.8, 0.12, 0.2, M.metalDark, { pos: [-1.14, 2.6, -5.4], rot: [0, -Math.PI / 2, 0], outline: 0.7 });
   })();
 
-  // neighbouring buildings
+  // 邻居楼
   function building(
     box: { x0: number; x1: number; z0: number; z1: number; h: number },
     floors: number,
@@ -643,33 +642,33 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
       else if (f === '+x') builder.plane(d, h, glow(0xffffff, 0.86, { map: tx }), { pos: [box.x1 + 0.01, h / 2, cz], rot: [0, Math.PI / 2, 0] });
       else if (f === '-x') builder.plane(d, h, glow(0xffffff, 0.86, { map: tx }), { pos: [box.x0 - 0.01, h / 2, cz], rot: [0, -Math.PI / 2, 0] });
     }
-    // parapet
+    // 女儿墙
     builder.box(w + 0.2, 0.28, d + 0.2, toon(0x3a3f4c, { ramp: 3 }), { pos: [cx, h + 0.14, cz], outline: 1.0 });
   }
 
-  // east neighbour (narrow mixed-use block) — its west wall lines the alley
+  // 东侧邻居楼（窄面商住混合）—— 它的西墙贴着后巷
   building({ ...NEIGHBOUR_E, h: NEIGHBOUR_E.h }, 3, 12, { lit: 0.4, base: '#3f4450' });
-  // west neighbour (two-storey shop house)
+  // 西侧邻居楼（两层店铺住宅）
   building({ ...NEIGHBOUR_W, h: NEIGHBOUR_W.h }, 2, 27, { lit: 0.5, base: '#4a443c' });
 
-  // shuttered shopfront on the west neighbour, facing the main street
+  // 西侧邻居楼上的卷帘门铺面，朝向主街
   (() => {
     const t = shutterTexture();
     builder.plane(2.6, 1.9, toon(0xffffff, { map: t, ramp: 3 }), { pos: [-11.3, 1.15, 4.61] });
     builder.box(2.8, 0.16, 0.24, M.metalDark, { pos: [-11.3, 2.2, 4.55], outline: 0.8 });
     builder.box(2.8, 0.12, 0.3, toon(0x4a3f38, { ramp: 3 }), { pos: [-11.3, 2.4, 4.5], outline: 0.8 });
-    // striped awning
+    // 条纹雨棚
     for (let i = 0; i < 8; i++) {
       builder.box(0.34, 0.05, 0.7, i % 2 ? toon(0xb8443f) : toon(0xe4ded0), {
         pos: [-12.4 + i * 0.35, 2.5, 4.85], rot: [0.3, 0, 0], outline: 0.5,
       });
     }
-    // wall lamp + small neon
+    // 壁灯 + 小块霓虹
     builder.box(0.1, 0.16, 0.1, M.metalDark, { pos: [-9.7, 2.6, 4.5], outline: 0.6 });
     builder.box(0.08, 0.12, 0.08, glow(0xffcf8a, 1.6), { pos: [-9.7, 2.5, 4.44], outline: 0 });
   })();
 
-  // neon vertical sign on the east neighbour, facing the forecourt
+  // 东侧邻居楼上的竖排霓虹招牌，朝向店前场
   (() => {
     const t = roadSignTexture('コインランドリー', 'COIN LAUNDRY', '#8b3fd6');
     const mat = glow(0xffffff, 1.5, { map: t });
@@ -679,7 +678,7 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
     if (ctx.ground) ctx.ground.addLight([11.4, 3.6, 0.2], [0.62, 0.4, 1.0], 4.2, 0.55);
   })();
 
-  // pink snack-bar neon on the west neighbour, facing the main street
+  // 西侧邻居楼上的粉色小酒馆霓虹，朝向主街
   (() => {
     const W = 256, Hh = 768;
     const [c, g] = cvs(W, Hh);
@@ -702,7 +701,7 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
     if (ctx.ground) ctx.ground.addLight([-10.6, 3.4, 5.6], [1.0, 0.42, 0.68], 4.4, 0.6);
   })();
 
-  // small cyan shop sign near the side street
+  // 侧街附近的小块青色店招
   (() => {
     const t = roadSignTexture('クリーニング', 'CLEANING', '#1f8fb8');
     const mat = glow(0xffffff, 1.35, { map: t });
@@ -711,7 +710,7 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
     builder.plane(1.4, 0.28, mat, { pos: [-11.2, 3.2, 4.8] });
   })();
 
-  // AC condensers + pipes on the alley walls
+  // 后巷墙面上的空调外机与管线
   function acUnit(x: number, y: number, z: number, rotY: number, w = 0.78) {
     builder.box(w, 0.56, 0.34, toon(0xd8d5cc, { ramp: 3 }), { pos: [x, y, z], rot: [0, rotY, 0], outline: 1.0 });
     builder.cyl(0.19, 0.19, 0.05, 12, toon(0x9a978f, { ramp: 3 }), {
@@ -727,13 +726,13 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
   acUnit(-9.45, 3.2, -6.2, Math.PI / 2);
   acUnit(-9.45, 4.4, -10.4, Math.PI / 2);
 
-  // vertical drain pipes in the alley
+  // 后巷的竖向落水管
   for (const [x, z] of [[8.5, -1.6], [8.5, -8.8], [9.9, -3.8], [9.9, -11.6]]) {
     builder.cyl(0.07, 0.07, 4.4, 8, M.metalDark, { pos: [x, 2.2, z], outline: 0.7 });
     builder.cyl(0.09, 0.09, 0.12, 8, M.metalDark, { pos: [x, 0.2, z], outline: 0.5 });
   }
 
-  // alley clutter: crates, a dumpster, a lantern at the dead end
+  // 后巷杂物：板条箱、垃圾箱，以及尽头的灯笼
   builder.box(1.0, 0.62, 0.72, toon(0x3f5a4a, { ramp: 3 }), { pos: [9.3, 0.31, -11.2], outline: 1.1 });
   builder.box(1.04, 0.08, 0.76, M.metalDark, { pos: [9.3, 0.66, -11.2], outline: 0.8 });
   for (let i = 0; i < 3; i++) {
@@ -745,9 +744,9 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
   builder.cyl(0.03, 0.03, 0.4, 6, M.metalDark, { pos: [9.7, 3.2, -12.7], outline: 0 });
   if (ctx.ground) ctx.ground.addLight([9.4, 2.6, -12.4], [1.0, 0.76, 0.5], 3.6, 0.6);
 
-  // animation
+  // 动画
   function update(t: number): void {
-    // traffic signal cycle
+    // 信号灯循环
     for (const s of dyn.signals) {
       const cyc = (t * 0.32 + s.offset) % 1;
       const phase = cyc < 0.42 ? 0 : cyc < 0.55 ? 1 : 2;
@@ -757,11 +756,11 @@ function buildProps(builder: Builder, scene: THREE.Scene, ctx: PropsCtx = {}): P
         m.color.lerp(target, 0.14);
       });
     }
-    // lamp halos breathe a little
+    // 路灯 halo 轻微呼吸
     dyn.lamps.forEach((h, i) => {
       h.material.opacity = 0.38 + 0.05 * Math.sin(t * 1.7 + i * 2.1);
     });
-    // sign flicker
+    // 招牌闪烁
     for (const m of dyn.flickers) {
       const f = 1 - 0.05 * Math.max(0, Math.sin(t * 5.3 + 1.2) - 0.92) * 8;
       m.color.setScalar(1.4 * f);

@@ -1,18 +1,17 @@
 /*
- * Restored from the bundled diorama (see reference/README.md).
+ * 还原自打包产物 diorama（见 docs/source-restore.md）。
  *
- * Mechanically converted back to source: the original module had the same
- * structure, this file just swaps the `window.__M` namespace wiring for ES
- * module imports/exports. The rendering logic itself is unchanged.
+ * 机械转换回源码：原模块结构相同，本文件只是把 `window.__M` 命名空间
+ * 接线换成 ES module 的 import/export，渲染逻辑本身未改动。
  *
- * TYPED ✓ — see docs/source-restore.md.
+ * TYPED ✓ — 见 docs/source-restore.md。
  */
 
 import * as THREE from 'three'
 
 // ---------------------------------------------------------------------------
-// Post processing: HDR scene target -> bright pass -> 3-level gaussian bloom
-// -> filmic composite with vignette, grain and a soft toon grade.
+// 后处理：HDR 场景 target → 亮部提取 → 三级高斯 bloom
+// → 电影感合成（暗角、颗粒与柔和的 toon 调色）。
 // ---------------------------------------------------------------------------
 
 const QUAD_VS = /* glsl */`
@@ -38,7 +37,7 @@ const BLUR_FS = /* glsl */`
   precision highp float;
   varying vec2 vUv;
   uniform sampler2D tDiffuse;
-  uniform vec2 uDir;      // texel-sized direction
+  uniform vec2 uDir;      // 以 texel 为单位的方向
   void main() {
     vec3 s = texture2D(tDiffuse, vUv).rgb * 0.2270270270;
     s += texture2D(tDiffuse, vUv + uDir * 1.3846153846).rgb * 0.3162162162;
@@ -74,7 +73,7 @@ const COMPOSITE_FS = /* glsl */`
 
   void main() {
     vec2 uv = vUv;
-    // gentle lens breathing / chromatic separation towards the frame edge
+    // 轻微的镜头呼吸 / 向画面边缘的色散
     vec2 d = uv - 0.5;
     float r2 = dot(d, d);
     vec2 off = d * r2 * 0.0022;
@@ -91,17 +90,17 @@ const COMPOSITE_FS = /* glsl */`
     col *= uExposure;
     col = aces(col);
 
-    // cool the shadows, warm the highlights — the classic night-anime grade
+    // 暗部偏冷、亮部偏暖 —— 经典的夜景动画调色
     float lum = dot(col, vec3(0.299, 0.587, 0.114));
     col = mix(col * vec3(0.92, 0.97, 1.08), col * vec3(1.06, 1.005, 0.94), smoothstep(0.18, 0.85, lum));
-    // saturation lift
+    // 提升饱和度
     col = mix(vec3(lum), col, 1.18);
 
-    // vignette
+    // 暗角
     float vig = smoothstep(1.25, 0.20, r2 * 1.6);
     col *= mix(0.82, 1.0, vig);
 
-    // fine grain so the flats never look dead
+    // 细颗粒，让平涂区域不至于死板
     float g = hash(uv * uRes + fract(uTime) * 91.7) - 0.5;
     col += g * 0.018 * (1.0 - lum * 0.6);
 
@@ -133,14 +132,14 @@ class PostFX {
   renderer: THREE.WebGLRenderer
   sceneRT: THREE.WebGLRenderTarget
   brightRT: THREE.WebGLRenderTarget
-  /** three mip levels of the gaussian chain (4×, 8×, 16× down) */
+  /** 高斯链的三级 mip（依次降采样 4×、8×、16×） */
   blurA: THREE.WebGLRenderTarget[]
   blurB: THREE.WebGLRenderTarget[]
   brightPass: Pass
   blurPass: Pass
-  /** final filmic pass — its uniforms carry `uBloom` and the `uExposure` our UI drives */
+  /** 最后的电影感合成 pass —— 它的 uniform 携带 `uBloom` 与 UI 驱动的 `uExposure` */
   composite: Pass
-  /** [width, height] of the scene target in device pixels */
+  /** 场景 target 的尺寸 [宽, 高]，单位为设备像素 */
   size: [number, number] = [1, 1]
 
   constructor(renderer: THREE.WebGLRenderer, samples = 4) {
@@ -184,7 +183,7 @@ class PostFX {
     this.sceneRT.setSize(W, H);
     this.brightRT.setSize(Math.max(1, W >> 1), Math.max(1, H >> 1));
     for (let i = 0; i < 3; i++) {
-      const s = 2 << (i + 1); // 4, 8, 16
+      const s = 2 << (i + 1); // 4、8、16
       this.blurA[i].setSize(Math.max(1, Math.floor(W / s)), Math.max(1, Math.floor(H / s)));
       this.blurB[i].setSize(Math.max(1, Math.floor(W / s)), Math.max(1, Math.floor(H / s)));
     }
@@ -201,11 +200,11 @@ class PostFX {
     r.clear();
     r.render(scene, camera);
 
-    // bright pass
+    // 亮部提取
     this.brightPass.material.uniforms.tDiffuse.value = this.sceneRT.texture;
     this.brightPass.render(r, this.brightRT);
 
-    // gaussian chain
+    // 高斯模糊链
     let src = this.brightRT.texture;
     for (let i = 0; i < 3; i++) {
       const a = this.blurA[i], b = this.blurB[i];

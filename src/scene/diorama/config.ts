@@ -1,20 +1,18 @@
 /*
- * Restored from the bundled diorama (see reference/README.md).
+ * 还原自打包产物 diorama（见 docs/source-restore.md）。
  *
- * Mechanically converted back to source: the original module had the same
- * structure, this file just swaps the `window.__M` namespace wiring for ES
- * module imports/exports. The rendering logic itself is unchanged.
+ * 机械转换回源码：原模块结构相同，本文件只是把 `window.__M` 命名空间
+ * 接线换成 ES module 的 import/export，渲染逻辑本身未改动。
  *
- * TYPED ✓ — this file has been through the incremental typing pass described in
- * docs/source-restore.md: helpers carry real signatures, data objects are
- * inferred. Use it as the reference for typing the remaining modules.
+ * TYPED ✓ — 本文件已完成 docs/source-restore.md 所述的渐进类型化：
+ * 工具函数带真实签名，数据对象交给推断。可作为其余模块类型化的参考范例。
  */
 
 import * as THREE from 'three'
 
 // ---------------------------------------------------------------------------
-// Layout + palette for the rainy-night convenience-store diorama.
-// Everything is authored in world units (1 unit ~= 1 meter) on a 26x26 base.
+// 雨夜便利店 diorama 的布局常量与调色板。
+// 全部以世界单位（1 单位 ≈ 1 米）在 26x26 的底座上布置。
 // ---------------------------------------------------------------------------
 
 const BASE = {
@@ -25,10 +23,10 @@ const BASE = {
   top: 0,
 };
 
-// --- streets -----------------------------------------------------------------
+// --- 街道 ---------------------------------------------------------------------
 const STREET = {
-  main: { z0: 4.6, z1: 11.0 }, // runs along X (east-west)
-  side: { x0: -9.6, x1: -5.0 }, // narrow side street, runs along Z
+  main: { z0: 4.6, z1: 11.0 }, // 主街，沿 X 轴（东西向）
+  side: { x0: -9.6, x1: -5.0 }, // 窄小的侧街，沿 Z 轴
   curbH: 0.15,
   curbW: 0.26,
 };
@@ -38,13 +36,13 @@ const WALK = {
   southZ1: 13.0,
   northZ0: 3.0,
   northZ1: 4.6,
-  sideW0: -5.0, // east sidewalk of the side street
+  sideW0: -5.0, // 侧街的人行道（东侧）
   sideW1: -3.6,
-  westW0: -13.0, // west sidewalk of the side street
+  westW0: -13.0, // 侧街的人行道（西侧）
   westW1: -9.6,
 };
 
-// --- store -------------------------------------------------------------------
+// --- 便利店 -------------------------------------------------------------------
 const STORE = {
   x0: -1.0,
   x1: 8.4,
@@ -64,10 +62,10 @@ const ALLEY_E = { x0: 8.4, x1: 10.0, z0: -13.0, z1: -0.6 };
 const NEIGHBOUR_E = { x0: 10.0, x1: 13.0, z0: -13.0, z1: -0.6, h: 7.4 };
 const NEIGHBOUR_W = { x0: -13.0, x1: -9.6, z0: -13.0, z1: 4.6, h: 6.1 };
 
-// --- palette -----------------------------------------------------------------
+// --- 调色板 -------------------------------------------------------------------
 const c = (hex: number): number => hex;
 const COLORS = {
-  // ground / structure
+  // 地面 / 结构
   asphalt: c(0x2b2f3b),
   asphaltDark: c(0x22252f),
   sidewalk: c(0x565b69),
@@ -77,7 +75,7 @@ const COLORS = {
   baseTop: c(0x232733),
   paint: c(0xd8dbe2),
 
-  // store exterior
+  // 店面外观
   wall: c(0xd6d0c4),
   wallShade: c(0xb9b3a6),
   wallTrim: c(0x3a4050),
@@ -89,7 +87,7 @@ const COLORS = {
   metalDark: c(0x2c313d),
   glassTint: c(0x9fc6e8),
 
-  // interior
+  // 店内
   floorTile: c(0xd9d2c6),
   floorTile2: c(0xc9c2b6),
   shelf: c(0xe7e9ee),
@@ -98,7 +96,7 @@ const COLORS = {
   warmLight: c(0xfff0cf),
   counter: c(0xdcd6ca),
 
-  // night lighting
+  // 夜间灯光
   lampWarm: c(0xffcf8a),
   lampCool: c(0xa9c8ff),
   neonPink: c(0xff4f9a),
@@ -107,7 +105,7 @@ const COLORS = {
   signalRed: c(0xff5a4d),
   signalGreen: c(0x62e6a4),
 
-  // misc props
+  // 其他道具
   vendingRed: c(0xd93b3b),
   vendingBody: c(0xe8ecf2),
   bikeFrame: c(0x38414f),
@@ -119,7 +117,7 @@ const COLORS = {
 
 const OUTLINE = { color: 0x0a0c14, px: 1.95 };
 
-// --- deterministic random ----------------------------------------------------
+// --- 确定性随机 ----------------------------------------------------------------
 function makeRng(seed = 1337): () => number {
   let s = seed >>> 0;
   return function rng() {
@@ -137,7 +135,7 @@ const smoothstep = (a: number, b: number, x: number): number => {
   return t * t * (3 - 2 * t);
 };
 
-/** axis-aligned footprint on the ground plane (x/z ranges + sizes) */
+/** 地面平面上的轴对齐占地（x/z 范围 + 尺寸） */
 export interface Box2 {
   x0: number
   x1: number
@@ -147,7 +145,7 @@ export interface Box2 {
   d: number
 }
 
-// --- tiny helpers ------------------------------------------------------------
+// --- 小工具 -------------------------------------------------------------------
 const box2 = (x0: number, x1: number, z0: number, z1: number): Box2 => ({
   x0, x1, z0, z1, w: x1 - x0, d: z1 - z0,
 });

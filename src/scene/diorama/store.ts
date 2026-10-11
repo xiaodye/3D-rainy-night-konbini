@@ -1,11 +1,10 @@
 /*
- * Restored from the bundled diorama (see reference/README.md).
+ * 还原自打包产物 diorama（见 docs/source-restore.md）。
  *
- * Mechanically converted back to source: the original module had the same
- * structure, this file just swaps the `window.__M` namespace wiring for ES
- * module imports/exports. The rendering logic itself is unchanged.
+ * 机械转换回源码：原模块结构相同，本文件只是把 `window.__M` 命名空间
+ * 接线换成 ES module 的 import/export，渲染逻辑本身未改动。
  *
- * TYPED ✓ — see docs/source-restore.md.
+ * TYPED ✓ — 见 docs/source-restore.md。
  */
 
 import * as THREE from 'three'
@@ -16,8 +15,8 @@ import type { Vec3 } from './toon'
 import type { WetGround } from './ground'
 
 // ---------------------------------------------------------------------------
-// The convenience store: shell, illuminated signage, glass storefront, and a
-// densely furnished interior that reads clearly through the windows.
+// 便利店本体：外壳、发光招牌、玻璃店面，
+// 以及透过橱窗也能看清的、陈设密集的店内。
 // ---------------------------------------------------------------------------
 
 const X0 = STORE.x0, X1 = STORE.x1, Z0 = STORE.z0, Z1 = STORE.z1;
@@ -27,12 +26,12 @@ const IX0 = X0 + WALL, IX1 = X1 - WALL;
 const IZ0 = Z0 + WALL, IZ1 = Z1 - WALL;
 const FLOOR = 0.18;
 const CEIL = 2.92;
-const FRONT = Z1; // facade plane
+const FRONT = Z1; // 立面平面
 const GY0 = STORE.glassBase; // 0.22
 const GY1 = STORE.glassTop; // 2.95
 
 // ---------------------------------------------------------------------------
-// canvas art helpers
+// 画布绘制工具
 // ---------------------------------------------------------------------------
 function cvs(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const c = document.createElement('canvas');
@@ -63,7 +62,7 @@ function roundRect(
   g.closePath();
 }
 
-/** Big fascia sign: brand block on the left, name + 24H badge on the right. */
+/** 门头大招牌：左侧品牌图形块，右侧店名 + 24H 徽标。 */
 function fasciaTexture(): THREE.CanvasTexture {
   const W = 2048, Hh = 256;
   const [c, g] = cvs(W, Hh);
@@ -74,11 +73,11 @@ function fasciaTexture(): THREE.CanvasTexture {
   g.fillStyle = bg;
   g.fillRect(0, 0, W, Hh);
 
-  // brand colour bands top / bottom
+  // 顶部 / 底部的品牌色带
   g.fillStyle = '#2f6fe0'; g.fillRect(0, 0, W, 12);
   g.fillStyle = '#ff8a3d'; g.fillRect(0, Hh - 16, W, 16);
 
-  // logo mark
+  // 品牌图形
   const cx = 150, cy = Hh / 2, r = 74;
   g.fillStyle = '#2f6fe0';
   roundRect(g, cx - r, cy - r, r * 2, r * 2, 26); g.fill();
@@ -89,7 +88,7 @@ function fasciaTexture(): THREE.CanvasTexture {
   g.fillStyle = '#ff8a3d';
   g.beginPath(); g.arc(cx + 34, cy + 30, 20, 0, 6.3); g.fill();
 
-  // wordmark
+  // 店名字标
   g.fillStyle = '#1b2b52';
   g.font = `bold 148px ${EN}`;
   g.textAlign = 'left';
@@ -104,7 +103,7 @@ function fasciaTexture(): THREE.CanvasTexture {
   g.font = `500 52px ${EN}`;
   g.fillText('CONVENIENCE STORE', 800, cy + 80);
 
-  // 24H badge
+  // 24H 徽标
   const bx = W - 430;
   g.fillStyle = '#ff8a3d';
   roundRect(g, bx, 44, 360, 168, 26); g.fill();
@@ -115,7 +114,7 @@ function fasciaTexture(): THREE.CanvasTexture {
   g.font = `600 44px ${JP}`;
   g.fillText('年中無休', bx + 180, 190);
 
-  // soft lightbox falloff
+  // 灯箱的柔和渐隐
   const vg = g.createRadialGradient(W / 2, Hh / 2, Hh * 0.3, W / 2, Hh / 2, W * 0.62);
   vg.addColorStop(0, 'rgba(0,0,0,0)');
   vg.addColorStop(1, 'rgba(40,60,110,0.18)');
@@ -124,14 +123,14 @@ function fasciaTexture(): THREE.CanvasTexture {
   return tex(c);
 }
 
-/** Vertical pylon sign (Japanese street-corner style). */
+/** 竖式灯箱招牌（日式街角风格）。 */
 function pylonTexture(): THREE.CanvasTexture {
   const W = 256, Hh = 1024;
   const [c, g] = cvs(W, Hh);
   g.fillStyle = '#f7f9fd'; g.fillRect(0, 0, W, Hh);
   g.fillStyle = '#2f6fe0'; g.fillRect(0, 0, W, 18); g.fillRect(0, Hh - 18, W, 18);
 
-  // logo
+  // 品牌图形
   g.fillStyle = '#2f6fe0';
   roundRect(g, 48, 46, 160, 160, 30); g.fill();
   g.fillStyle = '#ffffff';
@@ -139,7 +138,7 @@ function pylonTexture(): THREE.CanvasTexture {
   g.fillStyle = '#ff8a3d';
   g.beginPath(); g.arc(160, 168, 24, 0, 6.3); g.fill();
 
-  // vertical katakana
+  // 竖排片假名
   g.fillStyle = '#1b2b52';
   g.font = `bold 118px ${JP}`;
   g.textAlign = 'center';
@@ -162,7 +161,7 @@ function posterTexture(seed: number, hue: number): THREE.CanvasTexture {
   bg.addColorStop(0, `#${base.clone().offsetHSL(0, 0, 0.22).getHexString()}`);
   bg.addColorStop(1, `#${base.clone().offsetHSL(0.05, 0, -0.16).getHexString()}`);
   g.fillStyle = bg; g.fillRect(0, 0, W, Hh);
-  // abstract shapes
+  // 抽象图形
   for (let i = 0; i < 5; i++) {
     g.globalAlpha = 0.18 + rng() * 0.3;
     g.fillStyle = i % 2 ? '#ffffff' : `#${base.clone().offsetHSL(0.5, 0.1, 0).getHexString()}`;
@@ -171,7 +170,7 @@ function posterTexture(seed: number, hue: number): THREE.CanvasTexture {
     g.fill();
   }
   g.globalAlpha = 1;
-  // headline bars
+  // 标题色条
   g.fillStyle = 'rgba(255,255,255,0.95)';
   g.fillRect(28, Hh - 168, W - 56, 26);
   g.fillStyle = 'rgba(255,255,255,0.75)';
@@ -203,7 +202,7 @@ function interiorFloorTexture(): THREE.CanvasTexture {
     g.beginPath(); g.moveTo(i * s, 0); g.lineTo(i * s, S); g.stroke();
     g.beginPath(); g.moveTo(0, i * s); g.lineTo(S, i * s); g.stroke();
   }
-  // green guide arrows pointing to the register
+  // 指向收银台的绿色导视箭头
   g.fillStyle = 'rgba(38,150,110,0.5)';
   const arrow = (x: number, y: number, rot: number) => {
     g.save(); g.translate(x, y); g.rotate(rot);
@@ -229,7 +228,7 @@ function productColor(i: number, rng: () => number): number {
 }
 
 // ---------------------------------------------------------------------------
-// glass shader: faint tint, fresnel edge, anime highlight, running rain
+// 玻璃 shader：淡着色、fresnel 边缘、动画式高光、流动的雨水
 // ---------------------------------------------------------------------------
 const GLASS_VS = /* glsl */`
   varying vec3 vWorld;
@@ -262,7 +261,7 @@ const GLASS_FS = /* glsl */`
     vec3 V = normalize(cameraPosition - vWorld);
     float fres = pow(1.0 - abs(dot(normalize(vN), V)), 3.0);
 
-    // running rain: columns of droplets sliding down at different speeds
+    // 流动的雨：一列列水珠以不同速度向下滑落
     float rain = 0.0;
     for (int i = 0; i < 3; i++) {
       float fi = float(i);
@@ -277,10 +276,10 @@ const GLASS_FS = /* glsl */`
       rain += streak * (0.5 - fi * 0.12);
     }
 
-    // slow film of water everywhere
+    // 覆盖整体的缓慢水膜
     float film = 0.05 * (0.5 + 0.5 * sin(uv.x * 9.0 + uTime * 0.7)) * 0.5;
 
-    // one soft diagonal anime highlight
+    // 一道柔和的斜向动画式高光
     float band = smoothstep(0.34, 0.5, uv.x * 0.42 + uv.y * 0.58)
                * (1.0 - smoothstep(0.5, 0.66, uv.x * 0.42 + uv.y * 0.58));
 
@@ -310,24 +309,24 @@ function glassMaterial(tint = 0x9fc6e8, scale: [number, number] = [3, 2]): THREE
 }
 
 // ---------------------------------------------------------------------------
-/** what the store needs from its caller */
+/** store 模块需要调用方提供的东西 */
 export interface StoreCtx {
   ground?: WetGround
-  /** pin the automatic doors open (the `?door` debug flag) */
+  /** 保持自动门敞开（`?door` 调试参数） */
   forceDoor?: boolean
 }
 
-/** animated state the store keeps between frames */
+/** store 模块在帧间维持的动画状态 */
 interface StoreDynamics {
-  /** the rain-streaked glass shaders, ticked every frame */
+  /** 带雨痕的玻璃 shader，每帧 tick */
   glassMats: THREE.ShaderMaterial[]
   doors: { left: THREE.Object3D; right: THREE.Object3D; x0: number; x1: number }[]
   lights: THREE.PointLight[]
-  /** emissive materials that flicker (shop signs, pylon face) */
+  /** 闪烁的自发光材质（店招、灯箱面） */
   flickers: THREE.MeshBasicMaterial[]
 }
 
-/** the store group, its per-frame tick and the shared glass material */
+/** store 的 group、每帧 tick，以及共享的玻璃材质 */
 export interface StoreHandle {
   group: THREE.Group
   update(t: number, dt: number, camera?: THREE.Camera): void
@@ -355,7 +354,7 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
     signSoft: glow(0xe8f0ff, 1.25),
     roof: toon(0x6e7079, { ramp: 3 }),
     roofSeam: toon(0x55575f, { ramp: 3 }),
-    // interior — emissive-boosted so the shop reads bright through the glass
+    // 店内 —— 提高自发光，让店面透过玻璃看起来明亮
     floor: toon(0xcbc4b6, { map: interiorFloorTexture(), emissive: 0x201c15 }),
     iWall: toon(0xc2bcb0, { emissive: 0x211d16 }),
     iWallCool: toon(0xb8c0c8, { emissive: 0x181e26 }),
@@ -373,33 +372,33 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
     door: toon(0xdfe4ec),
   };
 
-  // 1. shell
+  // 1. 外壳
   const wallH = H;
-  // back wall
+  // 后墙
   builder.box(X1 - X0, wallH, WALL, M.wall, { pos: [(X0 + X1) / 2, wallH / 2, Z0 + WALL / 2], outline: 1.1 });
-  // left (west) wall
+  // 左（西）墙
   builder.box(WALL, wallH, Z1 - Z0, M.wall, { pos: [X0 + WALL / 2, wallH / 2, (Z0 + Z1) / 2], outline: 1.1 });
-  // right (east) wall
+  // 右（东）墙
   builder.box(WALL, wallH, Z1 - Z0, M.wall, { pos: [X1 - WALL / 2, wallH / 2, (Z0 + Z1) / 2], outline: 1.1 });
 
-  // front facade above the glass
+  // 玻璃上方的正立面
   const headerY0 = GY1;
   builder.box(X1 - X0, H - headerY0, WALL, M.wall, {
     pos: [(X0 + X1) / 2, (headerY0 + H) / 2, FRONT - WALL / 2], outline: 1.1,
   });
-  // front corner pillars
+  // 正面的角柱
   builder.box(0.62, headerY0, WALL, M.wall, { pos: [X0 + 0.31, headerY0 / 2, FRONT - WALL / 2], outline: 1.1 });
   builder.box(0.62, headerY0, WALL, M.wall, { pos: [X1 - 0.31, headerY0 / 2, FRONT - WALL / 2], outline: 1.1 });
-  // low plinth under the glass
+  // 玻璃下方的矮踢脚
   builder.box(X1 - X0 - 1.24, GY0, WALL + 0.06, M.wallShade, {
     pos: [(X0 + X1) / 2, GY0 / 2, FRONT - WALL / 2 + 0.03], outline: 1.0,
   });
 
-  // roof slab + parapet
+  // 屋面板 + 女儿墙
   builder.box(X1 - X0 + 0.3, 0.22, Z1 - Z0 + 0.3, M.roof, {
     pos: [(X0 + X1) / 2, H - 0.11, (Z0 + Z1) / 2], outline: 1.0,
   });
-  // roof membrane seams
+  // 屋面卷材的接缝
   for (let x = X0 + 1.6; x < X1; x += 2.2) {
     builder.box(0.05, 0.03, Z1 - Z0, M.roofSeam, { pos: [x, H + 0.005, (Z0 + Z1) / 2], outline: 0 });
   }
@@ -412,13 +411,13 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
   parapet(0.22, Z1 - Z0 + 0.3, X1 + 0.04, (Z0 + Z1) / 2);
   parapet(X1 - X0 + 0.3, 0.22, (X0 + X1) / 2, Z1 + 0.04);
 
-  // roof clutter
+  // 屋顶杂物
   builder.box(1.1, 0.72, 0.62, M.metal, { pos: [6.9, H + 0.47, -6.4], outline: 1.1 });
   builder.cyl(0.26, 0.26, 0.55, 10, M.metal, { pos: [6.9, H + 0.5, -6.0], rot: [Math.PI / 2, 0, 0], outline: 1.1 });
   builder.box(0.9, 0.6, 0.56, M.metal, { pos: [1.4, H + 0.41, -7.8], outline: 1.1 });
   builder.cyl(0.09, 0.09, 1.3, 8, M.metalDark, { pos: [2.6, H + 0.65, -5.2], outline: 1.0 });
   builder.cyl(0.32, 0.32, 0.14, 10, M.metalDark, { pos: [2.6, H + 1.32, -5.2], outline: 1.0 });
-  // low water tank, satellite dish and a service box
+  // 矮水箱、卫星天线与配电箱
   builder.box(0.62, 0.5, 0.62, M.metalDark, { pos: [0.3, H + 0.4, -2.6], outline: 1.0 });
   builder.box(0.68, 0.08, 0.68, M.metal, { pos: [0.3, H + 0.68, -2.6], outline: 0.8 });
   builder.add(new THREE.SphereGeometry(0.42, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.36), M.white, {
@@ -427,23 +426,23 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
   builder.cyl(0.05, 0.05, 0.5, 8, M.metalDark, { pos: [7.6, H + 0.25, -2.2], outline: 0.6 });
   builder.box(0.5, 0.34, 0.28, M.metal, { pos: [4.9, H + 0.28, -8.4], outline: 0.9 });
 
-  // 2. signage
+  // 2. 招牌
   const fasciaTex = fasciaTexture();
   const signMat = glow(0xffffff, 1.18, { map: fasciaTex });
   dynamic.flickers.push(signMat);
-  // lightbox body
+  // 灯箱箱体
   builder.box(X1 - X0 - 0.24, 1.06, 0.30, M.fascia, {
     pos: [(X0 + X1) / 2, 3.56, FRONT + 0.14], outline: 1.0,
   });
-  // lit face
+  // 发光面
   builder.plane(X1 - X0 - 0.3, 1.0, signMat, { pos: [(X0 + X1) / 2, 3.56, FRONT + 0.30] });
-  // under-fascia trim strip with a row of tiny lamps
+  // 门头下沿的装饰条，带一排小灯
   builder.box(X1 - X0 - 0.3, 0.06, 0.16, M.metalDark, { pos: [(X0 + X1) / 2, 3.0, FRONT + 0.18], outline: 0 });
   for (let x = X0 + 0.7; x < X1 - 0.5; x += 0.62) {
     builder.cyl(0.055, 0.055, 0.03, 8, M.lightPanel, { pos: [x, 2.97, FRONT + 0.16], outline: 0 });
   }
 
-  // pylon sign on the forecourt corner
+  // 店前场一角的竖式灯箱
   const pylonTex = pylonTexture();
   const pylonFace = glow(0xffffff, 1.22, { map: pylonTex });
   dynamic.flickers.push(pylonFace);
@@ -454,33 +453,33 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
   builder.plane(0.4, 3.2, pylonFace, { pos: [9.35 + 0.365, 3.65, 2.35], rot: [0, Math.PI / 2, 0] });
   builder.plane(0.4, 3.2, pylonFace, { pos: [9.35 - 0.365, 3.65, 2.35], rot: [0, -Math.PI / 2, 0] });
 
-  // side (west) sign facing the side lot
+  // 朝向西侧空地的侧招牌
   builder.box(0.26, 0.9, 3.2, M.fascia, { pos: [X0 - 0.13, 3.55, -4.6], outline: 1.0 });
   builder.plane(3.0, 0.84, signMat, { pos: [X0 - 0.28, 3.55, -4.6], rot: [0, -Math.PI / 2, 0] });
 
-  // 3. storefront glass + mullions
+  // 3. 店面玻璃 + 竖框
   const glassMat = glassMaterial(0x9fc6e8, [4, 1.6]);
   dynamic.glassMats.push(glassMat);
   const mull = M.metalDark;
   const mullion = (x: number, w = 0.09) => builder.box(w, GY1 - GY0, 0.12, mull, {
     pos: [x, (GY0 + GY1) / 2, FRONT - 0.06], outline: 0.8,
   });
-  // top and bottom rails
+  // 上下横档
   builder.box(X1 - X0 - 1.0, 0.1, 0.14, mull, { pos: [(X0 + X1) / 2, GY1 + 0.02, FRONT - 0.06], outline: 0.9 });
   builder.box(X1 - X0 - 1.0, 0.08, 0.14, mull, { pos: [(X0 + X1) / 2, GY0 - 0.01, FRONT - 0.06], outline: 0.9 });
 
   const DOOR_X0 = 1.8, DOOR_X1 = 3.8;
-  // fixed panes left of the door
+  // 门左侧的固定玻璃
   for (const x of [X0 + 0.62, 0.95, 1.38]) mullion(x);
   mullion(DOOR_X0 - 0.05, 0.11);
   mullion(DOOR_X1 + 0.05, 0.11);
   for (const x of [4.25, 5.3, 6.35, 7.4, 8.05]) mullion(x);
-  // the glass sheets themselves (one big sheet, mullions read as divisions)
+  // 玻璃本体（一整块，靠竖框形成分格）
   builder.add(builder.planeGeo(X1 - X0 - 1.24, GY1 - GY0), glassMat, {
     pos: [(X0 + X1) / 2, (GY0 + GY1) / 2, FRONT - 0.055], outline: 0,
   });
 
-  // automatic sliding doors (dynamic)
+  // 自动移门（动态）
   const doorGlassL = glassMaterial(0x9fc6e8, [1.2, 1.6]);
   const doorGlassR = glassMaterial(0x9fc6e8, [1.2, 1.6]);
   dynamic.glassMats.push(doorGlassL, doorGlassR);
@@ -502,7 +501,7 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
     const f2 = f.clone(); f2.position.y = GY0 + 0.05; parent.add(f2);
     const rail = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.05, 0.07), M.metalDark);
     rail.position.set(0, (GY0 + GY1) / 2, 0); parent.add(rail);
-    // small blue decal band (the classic automatic-door sticker)
+    // 一小段蓝色贴纸（自动门上的经典标识）
     const decal = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.055), M.brandBlue);
     decal.position.set(0, GY1 - 0.42, 0.03); parent.add(decal);
     void sign;
@@ -511,32 +510,32 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
   doorPanel(dr, doorGlassR, false);
   dynamic.doors.push({ left: dl, right: dr, x0: DOOR_X0 + 0.5, x1: DOOR_X1 - 0.5 });
 
-  // door threshold + mat
+  // 门口的门槛与地垫
   builder.box(2.3, 0.06, 0.5, M.metal, { pos: [2.8, 0.03, FRONT + 0.24], outline: 0.8 });
   builder.box(2.0, 0.03, 0.62, toon(0x2b2f38), { pos: [2.8, 0.055, FRONT + 0.62], outline: 0.6 });
 
-  // entrance canopy
+  // 入口雨棚
   builder.box(3.4, 0.14, 1.3, M.fascia, { pos: [2.8, 2.9, FRONT + 0.6], outline: 1.0 });
   builder.box(3.4, 0.06, 0.1, M.metalDark, { pos: [2.8, 2.82, FRONT + 1.2], outline: 0.6 });
   for (const x of [1.7, 2.8, 3.9]) {
     builder.cyl(0.11, 0.11, 0.05, 10, M.lightPanel, { pos: [x, 2.8, FRONT + 0.45], outline: 0 });
   }
 
-  // 4. interior shell
+  // 4. 店内壳体
   const iw = IX1 - IX0, id = IZ1 - IZ0;
   const icx = (IX0 + IX1) / 2, icz = (IZ0 + IZ1) / 2;
-  // floor
+  // 地面
   builder.plate(iw, id, M.floor, { pos: [icx, FLOOR, icz] });
-  // ceiling
+  // 天花板
   builder.plate(iw, id, M.iCeil, { pos: [icx, CEIL, icz], rot: [0, 0, Math.PI] });
-  // interior wall skins (brighter than the shell so the inside glows)
+  // 店内墙皮（比外壳更亮，让内部有发光感）
   builder.plane(iw, CEIL - FLOOR, M.iWall, { pos: [icx, (FLOOR + CEIL) / 2, IZ0 + 0.02] });
   builder.plane(id, CEIL - FLOOR, M.iWall, { pos: [IX0 + 0.02, (FLOOR + CEIL) / 2, icz], rot: [0, Math.PI / 2, 0] });
   builder.plane(id, CEIL - FLOOR, M.iWallCool, { pos: [IX1 - 0.02, (FLOOR + CEIL) / 2, icz], rot: [0, -Math.PI / 2, 0] });
-  // interior side of the front wall (above the glass)
+  // 前墙的内侧（玻璃以上部分）
   builder.plane(iw, H - GY1, M.iWall, { pos: [icx, (GY1 + H) / 2, IZ1 - 0.02], rot: [0, Math.PI, 0] });
 
-  // ceiling light panels
+  // 天花板 light panels
   for (let x = IX0 + 1.1; x < IX1 - 0.6; x += 2.1) {
     for (let z = IZ0 + 1.2; z < IZ1 - 0.8; z += 2.6) {
       builder.box(1.5, 0.05, 0.34, M.lightPanel, { pos: [x, CEIL - 0.05, z], outline: 0 });
@@ -544,7 +543,7 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
     }
   }
 
-  // 5. interior fittings
+  // 5. 店内陈设
   const prod = (
     x: number, y: number, z: number,
     w: number, h: number, d: number,
@@ -554,13 +553,13 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
       pos: [x, y, z], outline,
     });
 
-  // --- back wall: refrigerated drink bank ----------------------------------
+  // --- 后墙：冷藏饮料柜 ---------------------------------------------------
   const fz = IZ0 + 0.05;
   const fx0 = IX0 + 1.1, fx1 = IX0 + 6.4;
   builder.box(fx1 - fx0 + 0.3, 2.28, 0.72, M.fridgeShelf, { pos: [(fx0 + fx1) / 2, FLOOR + 1.14, fz + 0.36], outline: 1.0 });
-  // glowing back panel
+  // 发光的背板
   builder.plane(fx1 - fx0, 1.9, M.fridgeGlow, { pos: [(fx0 + fx1) / 2, FLOOR + 1.2, fz + 0.06] });
-  // shelves + bottles
+  // 层板 + 瓶装饮料
   for (let s = 0; s < 4; s++) {
     const y = FLOOR + 0.36 + s * 0.44;
     builder.box(fx1 - fx0, 0.035, 0.5, M.fridgeShelf, { pos: [(fx0 + fx1) / 2, y, fz + 0.3], outline: 0.5 });
@@ -569,11 +568,11 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
       const col = productColor(i + s * 3, rng);
       const bh = 0.24 + rng() * 0.08;
       prod(bx, y + bh / 2 + 0.02, fz + 0.3, 0.15, bh, 0.15, col, 0.5);
-      // cap
+      // 瓶盖
       prod(bx, y + bh + 0.055, fz + 0.3, 0.08, 0.05, 0.08, col, 0.4);
     }
   }
-  // fridge door glass + frames
+  // 冷柜门玻璃 + 门框
   const fridgeGlass = glassMaterial(0xbfe0ff, [1.6, 1.2]);
   dynamic.glassMats.push(fridgeGlass);
   const doors = 4;
@@ -587,7 +586,7 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
   }
   builder.box(fx1 - fx0, 0.12, 0.78, M.metal, { pos: [(fx0 + fx1) / 2, FLOOR + 2.32, fz + 0.4], outline: 0.9 });
 
-  // --- back wall right: chilled bento / onigiri case ------------------------
+  // --- 后墙右侧：冷藏便当 / 饭团柜 ----------------------------------------
   const bx0 = fx1 + 0.35, bx1 = IX1 - 0.15;
   builder.box(bx1 - bx0, 2.1, 0.66, M.fridgeShelf, { pos: [(bx0 + bx1) / 2, FLOOR + 1.05, fz + 0.33], outline: 1.0 });
   builder.plane(bx1 - bx0, 1.75, M.fridgeGlow, { pos: [(bx0 + bx1) / 2, FLOOR + 1.1, fz + 0.05] });
@@ -604,7 +603,7 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
     pos: [(bx0 + bx1) / 2, FLOOR + 1.1, fz + 0.66], outline: 0,
   });
 
-  // --- gondola shelf runs ---------------------------------------------------
+  // --- 中央货架排 ---------------------------------------------------------
   const shelfRun = (x0: number, z0: number, z1: number) => {
     const w = 1.32, len = z1 - z0, cx = x0 + w / 2, cz = (z0 + z1) / 2;
     builder.box(w, 0.09, len, M.shelf, { pos: [cx, FLOOR + 0.09, cz], outline: 0.9 });
@@ -612,12 +611,12 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
     for (let s = 0; s < 4; s++) {
       const y = FLOOR + 0.44 + s * 0.38;
       builder.box(w, 0.035, len, M.shelf, { pos: [cx, y, cz], outline: 0.6 });
-      // coloured price rail (the green / blue conbini shelf strips)
+      // 彩色价签条（便利店里常见的绿 / 蓝货架条）
       const railCol = s % 2 ? 0x2f9e6a : 0x2f6fe0;
       const rail = toon(railCol, { emissive: new THREE.Color(railCol).multiplyScalar(0.4).getHex() });
       builder.box(0.03, 0.09, len, rail, { pos: [x0 + 0.015, y - 0.05, cz], outline: 0.3 });
       builder.box(0.03, 0.09, len, rail, { pos: [x0 + w - 0.015, y - 0.05, cz], outline: 0.3 });
-      // goods on both faces
+      // 两侧面都摆商品
       const n = Math.floor(len / 0.2);
       for (let i = 0; i < n; i++) {
         const pz = z0 + 0.11 + i * 0.2;
@@ -632,7 +631,7 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
   shelfRun(IX0 + 0.9, IZ0 + 2.1, IZ1 - 1.2);
   shelfRun(IX0 + 3.5, IZ0 + 2.1, IZ1 - 1.2);
 
-  // --- east wall: snacks + instant noodles ----------------------------------
+  // --- 东墙：零食 + 方便面 -------------------------------------------------
   const ex = IX1 - 0.02;
   builder.box(0.5, 2.4, 4.6, M.shelf, { pos: [ex - 0.26, FLOOR + 1.2, -6.2], outline: 1.0 });
   for (let s = 0; s < 5; s++) {
@@ -643,13 +642,13 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
       prod(ex - 0.26, y + 0.14, pz, 0.32, 0.24, 0.28, productColor(i + s * 3, rng), 0.5);
     }
   }
-  // freezer case on the east wall near the back
+  // 东墙靠里的冷冻柜
   builder.box(0.8, 1.9, 1.5, M.fridgeShelf, { pos: [ex - 0.4, FLOOR + 0.95, -8.1], outline: 1.0 });
   builder.add(builder.planeGeo(1.4, 1.4), fridgeGlass, {
     pos: [ex - 0.81, FLOOR + 1.0, -8.1], rot: [0, -Math.PI / 2, 0], outline: 0,
   });
 
-  // --- magazine rack (front-left, back to the window) -----------------------
+  // --- 杂志架（左前方，背对橱窗） ------------------------------------------
   const magX = IX0 + 1.0, magZ = IZ1 - 0.9;
   builder.box(1.5, 1.5, 0.44, M.shelf, { pos: [magX, FLOOR + 0.78, magZ], outline: 1.0 });
   for (let s = 0; s < 3; s++) {
@@ -664,31 +663,31 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
     }
   }
 
-  // --- register counter -----------------------------------------------------
+  // --- 收银台 -------------------------------------------------------------
   const cz = -2.7, cx0 = IX0 + 4.9, cx1 = IX1 - 0.35;
   builder.box(cx1 - cx0, 0.9, 0.95, M.counter, { pos: [(cx0 + cx1) / 2, FLOOR + 0.45, cz], outline: 1.1 });
   builder.box(cx1 - cx0 + 0.1, 0.07, 1.05, M.counterTop, { pos: [(cx0 + cx1) / 2, FLOOR + 0.93, cz], outline: 1.1 });
-  // lower shelf behind
+  // 后侧的底层搁板
   builder.box(cx1 - cx0, 0.05, 0.5, M.counter, { pos: [(cx0 + cx1) / 2, FLOOR + 0.25, cz - 0.75], outline: 0.7 });
-  // POS terminal
+  // POS 收银机
   builder.box(0.42, 0.1, 0.34, M.metal, { pos: [cx0 + 0.5, FLOOR + 1.0, cz], outline: 0.7 });
   builder.box(0.4, 0.3, 0.06, M.screen, { pos: [cx0 + 0.5, FLOOR + 1.2, cz - 0.06], rot: [-0.28, 0, 0], outline: 0 });
   builder.box(0.36, 0.28, 0.3, M.metalDark, { pos: [cx0 + 1.05, FLOOR + 1.08, cz], outline: 0.8 });
-  // coffee machine
+  // 咖啡机
   builder.box(0.5, 0.72, 0.5, M.metalDark, { pos: [cx0 + 1.75, FLOOR + 1.3, cz], outline: 1.0 });
   builder.box(0.44, 0.16, 0.06, M.screen, { pos: [cx0 + 1.75, FLOOR + 1.56, cz + 0.26], outline: 0 });
   builder.box(0.3, 0.1, 0.22, M.metal, { pos: [cx0 + 1.75, FLOOR + 1.0, cz + 0.12], outline: 0.6 });
-  // hot food case (oden / steamed buns)
+  // 热食柜（关东煮 / 包子）
   builder.box(0.72, 0.4, 0.52, M.warmGlow, { pos: [cx0 + 2.55, FLOOR + 1.14, cz], outline: 0 });
   builder.box(0.78, 0.06, 0.58, M.metal, { pos: [cx0 + 2.55, FLOOR + 0.94, cz], outline: 0.7 });
   builder.box(0.74, 0.44, 0.04, M.metal, { pos: [cx0 + 2.55, FLOOR + 1.14, cz + 0.28], outline: 0.5 });
-  // lottery / flyer stand on the counter end
+  // 台面一端的彩票 / 传单架
   builder.box(0.24, 0.42, 0.3, M.metal, { pos: [cx1 - 0.25, FLOOR + 1.18, cz], outline: 0.7 });
   builder.box(0.22, 0.3, 0.03, toon(0xf2f4f8, { emissive: 0x555a66 }), {
     pos: [cx1 - 0.25, FLOOR + 1.28, cz + 0.16], rot: [-0.16, 0, 0], outline: 0.4,
   });
 
-  // --- behind-counter goods wall (cigarettes / bottles) ---------------------
+  // --- 收银台后的商品墙（香烟 / 酒瓶） -------------------------------------
   const gw = IZ1 - 1.0;
   builder.box(cx1 - cx0, 1.9, 0.3, M.shelf, { pos: [(cx0 + cx1) / 2, FLOOR + 1.5, cz - 1.25], outline: 1.0 });
   for (let s = 0; s < 4; s++) {
@@ -702,35 +701,35 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
   }
   void gw;
 
-  // --- ATM in the front-right corner ---------------------------------------
+  // --- 右前方的 ATM -------------------------------------------------------
   builder.box(0.9, 1.7, 0.62, M.metal, { pos: [IX1 - 0.55, FLOOR + 0.85, IZ1 - 0.85], outline: 1.1 });
   builder.box(0.66, 0.44, 0.06, M.screen, { pos: [IX1 - 0.55, FLOOR + 1.24, IZ1 - 1.14], rot: [-0.1, 0, 0], outline: 0 });
   builder.box(0.5, 0.2, 0.04, M.metalDark, { pos: [IX1 - 0.55, FLOOR + 0.9, IZ1 - 1.14], outline: 0.5 });
 
-  // --- back room door -------------------------------------------------------
+  // --- 后场门 ---------------------------------------------------------------
   builder.box(0.95, 2.0, 0.08, M.door, { pos: [IX0 + 0.52, FLOOR + 1.0, IZ0 + 0.06], outline: 1.0 });
   builder.box(0.1, 0.1, 0.06, M.metal, { pos: [IX0 + 0.88, FLOOR + 1.0, IZ0 + 0.13], outline: 0.5 });
   builder.box(0.34, 0.2, 0.04, M.lightPanel, { pos: [IX0 + 0.52, FLOOR + 2.22, IZ0 + 0.08], outline: 0 });
 
-  // --- posters, clock, wall graphics ---------------------------------------
+  // --- 海报、挂钟、墙面装饰 -------------------------------------------------
   const posters = [posterTexture(7, 0.58), posterTexture(21, 0.06), posterTexture(35, 0.86)];
   const posterMats = posters.map((t) => glow(0xffffff, 1.05, { map: t }));
   posterMats.forEach((m, i) => {
     builder.plane(0.82, 1.15, m, { pos: [IX0 + 0.03, FLOOR + 1.75, -3.6 - i * 1.3], rot: [0, Math.PI / 2, 0] });
   });
-  // ceiling-hung aisle signs
+  // 天花板-hung aisle signs
   for (const [x, z] of [[IX0 + 1.5, IZ0 + 3.6], [IX0 + 4.1, IZ0 + 3.6], [IX0 + 6.6, IZ0 + 5.4]]) {
     builder.box(1.1, 0.34, 0.03, M.lightPanelCool, { pos: [x, CEIL - 0.62, z], outline: 0.5 });
     builder.box(0.05, 0.28, 0.05, M.metalDark, { pos: [x, CEIL - 0.42, z], outline: 0 });
   }
-  // wall clock
+  // 挂钟
   builder.cyl(0.22, 0.22, 0.06, 14, M.white, { pos: [IX0 + 0.06, FLOOR + 2.4, IZ1 - 2.2], rot: [0, 0, Math.PI / 2], outline: 0.8 });
   builder.cyl(0.19, 0.19, 0.02, 14, toon(0xf8f8fa, { emissive: 0x4a4a52 }), {
     pos: [IX0 + 0.1, FLOOR + 2.4, IZ1 - 2.2], rot: [0, 0, Math.PI / 2], outline: 0,
   });
 
-  // --- entry clutter --------------------------------------------------------
-  // promotion island just inside the door
+  // --- 入口处的陈设 ---------------------------------------------------------
+  // 进门处的促销堆头
   (() => {
     const ix = 5.6, iz = -1.5;
     builder.box(1.3, 0.5, 0.62, M.shelf, { pos: [ix, FLOOR + 0.25, iz], outline: 1.0 });
@@ -741,10 +740,10 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
         prod(ix - 0.52 + i * 0.26, FLOOR + 0.66, iz - 0.16 + j * 0.32, 0.22, 0.26, 0.26, c, 0.6);
       }
     }
-    // small poster board on top of the island
+    // 堆头顶部的小海报板
     builder.box(0.5, 0.3, 0.03, glow(0xf2f6ff, 0.85), { pos: [ix + 0.1, FLOOR + 0.86, iz - 0.3], rot: [-0.25, 0, 0], outline: 0.4 });
   })();
-  // newspaper / magazine shelf facing the window
+  // 面向橱窗的报刊架
   (() => {
     const nx = IX0 + 0.35, nz = IZ1 - 2.9;
     builder.box(0.4, 1.2, 1.3, M.shelf, { pos: [nx, FLOOR + 0.6, nz], outline: 1.0 });
@@ -758,13 +757,13 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
       }
     }
   })();
-  // basket stack
+  // 购物篮叠放
   for (let i = 0; i < 5; i++) {
     builder.box(0.42, 0.1, 0.3, toon(0x3f6fd0, { emissive: 0x1c2f5a }), {
       pos: [IX0 + 0.45, FLOOR + 0.06 + i * 0.1, IZ1 - 1.9], outline: 0.6,
     });
   }
-  // umbrella stand just inside the door
+  // 进门处的伞架
   builder.cyl(0.17, 0.14, 0.62, 12, M.metal, { pos: [IX0 + 1.9, FLOOR + 0.31, IZ1 - 1.15], outline: 1.0 });
   for (let i = 0; i < 4; i++) {
     const a = i * 1.5;
@@ -774,7 +773,7 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
     });
   }
 
-  // 6. lights
+  // 6. 灯光
   const mk = (x: number, y: number, z: number, col: number, i: number, d: number) => {
     const l = new THREE.PointLight(col, i, d, 2.0);
     l.position.set(x, y, z);
@@ -785,21 +784,21 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
   mk(icx, CEIL - 0.35, icz + 1.0, 0xffd894, 8.5, 16);
   mk(IX0 + 1.6, CEIL - 0.4, IZ0 + 2.4, 0xffe2ae, 5.0, 12);
   mk(IX1 - 1.2, CEIL - 0.4, IZ0 + 2.4, 0xffd894, 5.0, 12);
-  mk(IX1 - 1.6, 2.0, cz, 0xffdc9e, 4.0, 8); // counter pool
-  mk(2.8, 2.4, FRONT + 0.5, 0xffd9a0, 9, 9); // under the canopy
-  mk(9.35, 4.6, 2.35, 0xbcd8ff, 6, 12); // pylon sign spill
+  mk(IX1 - 1.6, 2.0, cz, 0xffdc9e, 4.0, 8); // 收银台光池
+  mk(2.8, 2.4, FRONT + 0.5, 0xffd9a0, 9, 9); // 雨棚下
+  mk(9.35, 4.6, 2.35, 0xbcd8ff, 6, 12); // 灯箱溢光
 
-  // forecourt light pools
+  // 店前场的光池
   if (ctx.ground) {
     ctx.ground.addLight([2.8, 2.6, 0.6], [1.0, 0.82, 0.58], 6.5, 1.05);
     ctx.ground.addLight([3.8, 1.6, -1.6], [1.0, 0.88, 0.7], 9.0, 1.35);
     ctx.ground.addLight([6.5, 1.6, 0.4], [1.0, 0.9, 0.74], 7.0, 0.85);
     ctx.ground.addLight([9.35, 3.6, 2.35], [0.62, 0.76, 1.0], 6.0, 0.75);
     ctx.ground.addLight([2.8, 2.9, 1.4], [1.0, 0.86, 0.66], 4.0, 0.6);
-    ctx.ground.addLight([-1.5, 1.6, -2.4], [1.0, 0.9, 0.74], 3.6, 0.6); // vending machine
+    ctx.ground.addLight([-1.5, 1.6, -2.4], [1.0, 0.9, 0.74], 3.6, 0.6); // 自动贩卖机
   }
 
-  // 7. animation
+  // 7. 动画
   const cam = new THREE.Vector3();
   let doorState = 0;
   let doorTimer = 3.5;
@@ -808,13 +807,13 @@ function buildStore(builder: Builder, scene: THREE.Scene, ctx: StoreCtx = {}): S
     if (camera) camera.getWorldPosition(cam);
     for (const m of dynamic.glassMats) m.uniforms.uTime.value = t;
 
-    // sign flicker: mostly steady with occasional nervous dips
+    // 招牌闪烁：大部分时间稳定，偶尔神经质地一暗
     const f = 1
       - 0.06 * Math.max(0, Math.sin(t * 0.7) * Math.sin(t * 3.1))
       - 0.10 * Math.max(0, Math.sin(t * 11.3) - 0.93) * 6;
     for (const m of dynamic.flickers) m.color.setScalar(clamp(1.35 * f, 0, 2.2));
 
-    // automatic doors open on their own rhythm
+    // 自动门按自己的节奏开合
     doorTimer -= dt;
     if (doorTimer <= 0) { doorTimer = 11 + Math.random() * 9; doorState = 1; }
     if (ctx.forceDoor) doorState = 1;

@@ -1,35 +1,33 @@
 import type { Vec3Like } from './diorama'
 
 /**
- * Camera keyframes for the five narrative acts.
+ * 五幕叙事的相机关键帧。
  *
- * Authored in the same spherical system as the bundle's own `fitCamera`
- * (see reference/README.md):
+ * 使用与场景自身 `fitCamera` 相同的球坐标体系
+ * （见 docs/source-restore.md）：
  *     x = tx + sin(az)·cos(el)·dist
  *     y = ty + sin(el)·dist
  *     z = tz + cos(az)·cos(el)·dist
- * so any pose can be reproduced in the upstream demo with
- * `?az=&el=&d=&tx=&ty=&tz=` while calibrating, and the values here are
- * directly interchangeable with that URL form.
+ * 因此校准时任何机位都能用 `?az=&el=&d=&tx=&ty=&tz=` 在上游 demo 里复现，
+ * 这里的数值也可与该 URL 形式直接互换。
  *
- * Interpolating az/el/dist (instead of world positions) makes the camera
- * travel along the orbit around the diorama — cinematic, and it never cuts
- * through the buildings.
+ * 插值 az/el/dist（而非世界坐标）让相机沿环绕 diorama 的轨道运动 ——
+ * 更有电影感，也绝不会穿进建筑。
  *
- * Scene reference (units ≈ meters, base is 26×26, models on top of it):
- *   store  x[-1.0, 8.4]  z[-9.2, -0.6]  h 4.3   (storefront faces +z at z = -0.6)
- *   forecourt x[-3.6, 13.0] z[-0.6, 3.0]
- *   main street runs along X at z 4.6…11.0 · side street along Z at x -9.6…-5.0
- *   vending machines ≈ (-1.62, -2.6) and (-9.05, -4.6)
+ * 场景参考（单位 ≈ 米，底座 26×26，模型立在其上）：
+ *   store  x[-1.0, 8.4]  z[-9.2, -0.6]  h 4.3   （店面朝 +z，位于 z = -0.6）
+ *   前场（forecourt）x[-3.6, 13.0] z[-0.6, 3.0]
+ *   主街沿 X 轴，z 4.6…11.0 · 侧街沿 Z 轴，x -9.6…-5.0
+ *   自动贩卖机 ≈ (-1.62, -2.6) 与 (-9.05, -4.6)
  */
 export interface Act {
-  /** camera look-at point */
+  /** 相机的注视点 */
   target: Vec3Like
-  /** azimuth in degrees */
+  /** 方位角（度） */
   az: number
-  /** elevation in degrees */
+  /** 仰角（度） */
   el: number
-  /** distance from target */
+  /** 与注视点的距离 */
   dist: number
 }
 
@@ -39,22 +37,22 @@ export interface Pose {
 }
 
 export const ACTS: Act[] = [
-  // 01 — Arrival: high wide establishing shot of the whole diorama
+  // 01 — 抵达：高角度广角全景，整座 diorama 尽收眼底
   { target: { x: 1.4, y: 1.15, z: -1.4 }, az: 23, el: 21, dist: 47 },
-  // 02 — Storefront: street level, the glowing shopfront straight on
+  // 02 — 店面：街面高度，正对发光的店铺正面
   { target: { x: 3.2, y: 1.7, z: -0.6 }, az: 5, el: 7.5, dist: 15 },
-  // 03 — Through the glass: right up against the window, interior beyond
+  // 03 — 隔着玻璃：贴近橱窗，店内景深其后
   { target: { x: 3.4, y: 1.6, z: -1.0 }, az: 2, el: 3, dist: 6 },
-  // 04 — Street Corner: around to the side street, signals and vending machines
+  // 04 — 街角：绕到侧街，信号灯与自动贩卖机
   { target: { x: -2.5, y: 1.6, z: 0.6 }, az: -28, el: 9, dist: 17 },
-  // 05 — Night: pulled back and low, the glowing box in the big dark
+  // 05 — 夜色：拉远压低，黑暗里一只发光的小盒子
   { target: { x: 1.2, y: 2.4, z: -1.6 }, az: 27, el: 6, dist: 33 },
 ]
 
 const DEG = Math.PI / 180
 const smooth = (t: number) => t * t * (3 - 2 * t)
 
-/** az → world position (identical math to the bundle's fitCamera) */
+/** az → 世界坐标（与场景的 fitCamera 用同一套数学） */
 export function poseFrom(act: Act): Pose {
   const az = act.az * DEG
   const el = act.el * DEG
@@ -69,9 +67,9 @@ export function poseFrom(act: Act): Pose {
 }
 
 /**
- * Unwrap azimuths so a chain of acts never jumps across the ±180° seam.
- * (Not needed for the current set — all |Δaz| < 180° — but this keeps future
- * acts that orbit past the back of the store correct.)
+ * 解绕方位角，避免连续几幕在 ±180° 接缝处跳变。
+ * （当前这套机位用不到 —— 所有 |Δaz| < 180° —— 但将来若有机位绕过店铺背面，
+ * 这一步能保证结果正确。）
  */
 export function unwrapAzimuths(acts: Act[]): Act[] {
   if (acts.length === 0) return acts
@@ -88,7 +86,7 @@ export function unwrapAzimuths(acts: Act[]): Act[] {
 
 const UNWRAPPED = unwrapAzimuths(ACTS)
 
-/** progress 0..1 → interpolated camera pose (smoothstep between acts) */
+/** progress 0..1 → 插值后的相机机位（幕与幕之间走 smoothstep） */
 export function interpolateActs(progress: number): Pose {
   const p = Math.min(Math.max(progress, 0), 1)
   const t = p * (UNWRAPPED.length - 1)
@@ -111,5 +109,5 @@ export function interpolateActs(progress: number): Pose {
   return poseFrom(act)
 }
 
-/** the opening pose — where the camera returns to when idle */
+/** 开场机位 —— 空闲时相机回到的位置 */
 export const OPENING_POSE: Pose = poseFrom(ACTS[0])

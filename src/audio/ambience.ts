@@ -1,23 +1,22 @@
 /**
- * Procedural night ambience — rain, a warm pad, distant thunder.
+ * 程序化的雨夜环境音 —— 雨、温暖垫音、远处雷声。
  *
- * Synthesised with the Web Audio API instead of shipping an audio file:
- * no assets, no licensing, and the rain can follow the scene's 「雨量」slider.
+ * 用 Web Audio 实时合成，而不是附带音频文件：没有资源、没有授权问题，
+ * 而且雨声还能跟随场景的「雨量」滑块。
  *
- * Layers
- *   rain bed    quiet looped noise, low-passed — the distant wash of the storm
- *   raindrops   THE rain-on-water sound: discrete droplets, each a short narrow-
- *               band burst at a random pitch (1.5–4.3 kHz) with random stereo
- *               position, scheduled 15–40 per second. Density follows rain amount.
- *               (A plain low-passed noise bed alone reads as wind — the discrete
- *               transients are what make it read as droplets.)
- *   pad         A-minor drone (A2 E3 A3 C4), slightly detuned, breathing on a
- *               20-second LFO — the storefront's old speaker hum
- *   thunder     occasional low rumble bursts, randomised every 20–65 s
+ * 分层
+ *   雨幕底噪   安静的低通循环噪声 —— 远处那片雨势的底子
+ *   雨滴       真正的"雨打水面"声：离散水珠，每一颗都是随机音高
+ *              （1.5–4.3 kHz）的短窄带脉冲，随机立体声位置，
+ *              每秒调度 15–40 颗，密度跟随雨量。
+ *              （只用低通噪声底噪听起来就是风 —— 是这些离散瞬态让它读作雨滴。）
+ *   pad        A 小调持续音（A2 E3 A3 C4），轻度失谐，以 20 秒周期的 LFO
+ *              呼吸起伏 —— 像店里那台旧音响的底噪
+ *   雷声       偶发的低频隆隆，每 20–65 秒随机一次
  *
- * Autoplay policy: browsers block audio until a user gesture. `autoStartOnGesture()`
- * is wired to the first pointer/key event — the ambience fades in by itself unless
- * the user explicitly toggled it off (tracked in-session).
+ * 自动播放策略：浏览器在用户手势之前会拦截音频。`autoStartOnGesture()`
+ * 挂在首次 pointer/key 事件上 —— 除非用户明确关掉过（会话内记录），
+ * 否则环境音会自行淡入。
  */
 
 export class Ambience {
@@ -29,7 +28,7 @@ export class Ambience {
   private rainLoopTimer = 0
   private thunderTimer = 0
   private running = false
-  /** set when the user toggles off — blocks auto-start until they toggle on again */
+  /** 用户手动关闭时置位 —— 在他们重新开启之前阻止自动启动 */
   private userMuted = false
   private rainAmount = 1
   private listeners = new Set<() => void>()
@@ -38,7 +37,7 @@ export class Ambience {
     return this.running
   }
 
-  /** subscribe to start/stop; returns an unsubscribe function */
+  /** 订阅启动 / 停止；返回取消订阅的函数 */
   onChange(fn: () => void): () => void {
     this.listeners.add(fn)
     return () => this.listeners.delete(fn)
@@ -75,13 +74,13 @@ export class Ambience {
     this.emit()
   }
 
-  /** call from the first user gesture (pointer/keyboard) — respects manual mute */
+  /** 在首次用户手势（指针 / 键盘）时调用 —— 尊重用户的手动静音 */
   autoStartOnGesture(): void {
     if (this.running || this.userMuted) return
     void this.start().then(() => this.setRainAmount(this.rainAmount))
   }
 
-  /** rain slider amount (0–1.5) → drop density + bed loudness */
+  /** 雨量滑块值（0–1.5）→ 雨滴密度 + 底噪响度 */
   setRainAmount(v: number): void {
     this.rainAmount = Math.max(0, v)
     if (!this.ctx || !this.rainBedGain || !this.dropsGain) return
@@ -90,7 +89,7 @@ export class Ambience {
     this.dropsGain.gain.setTargetAtTime(0.32 + 0.2 * Math.min(1, this.rainAmount), t, 0.5)
   }
 
-  // ------------------------------------------------------------------ graph
+  // ------------------------------------------------------------------ 音频图
 
   private build(): void {
     const ctx = this.ctx!
@@ -112,7 +111,7 @@ export class Ambience {
     this.thunderTimer = window.setTimeout(fire, 14000 + Math.random() * 18000)
   }
 
-  /** a handful of pre-rendered 5–15 ms noise bursts — the raw material of a droplet */
+  /** 预生成的若干 5–15 ms 噪声脉冲 —— 构成一颗水珠的原料 */
   private buildDropBuffers(ctx: AudioContext): void {
     for (let b = 0; b < 8; b++) {
       const len = Math.floor(ctx.sampleRate * (0.005 + Math.random() * 0.01))
@@ -123,7 +122,7 @@ export class Ambience {
     }
   }
 
-  /** the distant wash — quiet, low, just enough to glue the droplets together */
+  /** 远处的雨幕 —— 安静、低沉，刚好能把水珠粘成一片 */
   private buildRainBed(ctx: AudioContext, master: GainNode): void {
     const seconds = 3
     const buffer = ctx.createBuffer(1, ctx.sampleRate * seconds, ctx.sampleRate)
@@ -161,7 +160,7 @@ export class Ambience {
     drift.start()
   }
 
-  /** discrete droplets: narrow-band bursts, random pitch, random stereo position */
+  /** 离散水珠：窄带脉冲，随机音高，随机立体声位置 */
   private buildDrops(ctx: AudioContext, master: GainNode): void {
     this.dropsGain = ctx.createGain()
     this.dropsGain.gain.value = 0.4
@@ -181,14 +180,14 @@ export class Ambience {
 
       const bp = ctx.createBiquadFilter()
       bp.type = 'bandpass'
-      bp.frequency.value = 1500 + Math.random() * 2800 // droplet pitch
-      bp.Q.value = 5 + Math.random() * 6 // narrow → tonal "plink"
+      bp.frequency.value = 1500 + Math.random() * 2800 // 水珠音高
+      bp.Q.value = 5 + Math.random() * 6 // 窄带 → 有音调的"滴"声
 
       const g = ctx.createGain()
       g.gain.value = 0.5 + Math.random() * 0.5
 
       const pan = ctx.createStereoPanner()
-      pan.pan.value = Math.random() * 1.6 - 0.8 // the rain falls all around
+      pan.pan.value = Math.random() * 1.6 - 0.8 // 雨落在四面八方
 
       src.connect(bp)
       bp.connect(g)
@@ -197,11 +196,11 @@ export class Ambience {
       src.start(ctx.currentTime + Math.random() * 0.05)
     }
 
-    // next batch: ~15–40 droplets per second at amount 1
+    // 下一批：amount 为 1 时每秒约 15–40 颗水珠
     this.rainLoopTimer = window.setTimeout(() => this.scheduleDrops(), 35 + Math.random() * 80)
   }
 
-  /** Am drone — warm, melancholic, breathing; the storefront's hum */
+  /** Am 持续音 —— 温暖、略带忧郁、会呼吸；店面的低鸣 */
   private buildPad(ctx: AudioContext, master: GainNode): void {
     const lp = ctx.createBiquadFilter()
     lp.type = 'lowpass'
@@ -239,7 +238,7 @@ export class Ambience {
     breathe.start()
   }
 
-  /** one low rumble: noise shaped by a power fade + slow wobble, deeply low-passed */
+  /** 一阵低沉的隆隆：噪声经幂次衰减与缓慢摆动塑形，再做深度低通 */
   private thunderBurst(ctx: AudioContext, master: GainNode): void {
     const dur = 2.6 + Math.random() * 2
     const len = Math.floor(ctx.sampleRate * dur)
@@ -263,5 +262,5 @@ export class Ambience {
   }
 }
 
-/** module-level singleton — one audio context for the page */
+/** 模块级单例 —— 整个页面共用一个 audio context */
 export const ambience = new Ambience()

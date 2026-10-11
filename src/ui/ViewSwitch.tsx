@@ -4,15 +4,14 @@ import { bootDiorama } from "../scene/diorama";
 import { ambience } from "../audio/ambience";
 
 /**
- * 视角模式切换 — top-right segmented switch between:
- *   「叙事」 the scroll-driven five acts
- *   「360°」 free exploration: drag to rotate, wheel to zoom, right-drag to pan
+ * 视角模式切换 —— 右上角的分段切换器：
+ *   「叙事」由滚动驱动的五幕
+ *   「360°」自由探索：拖拽旋转、滚轮缩放、右键平移
  *
- * Also hosts the ambience toggle (♪), the GLB export button (⤓) and the
- * GitHub repo link.
+ * 这一行还承载环境音开关（♪）、GLB 导出按钮（⤓）与 GitHub 仓库链接。
  *
- * Keyboard: V toggles, Esc leaves 360° (unless the water panel is open, in
- * which case Esc closes that first — it registers its own handler).
+ * 键盘：V 切换，Esc 退出 360°（若水面面板正打开，Esc 先关它 ——
+ * 该面板注册了自己的处理器）。
  */
 export default function ViewSwitch() {
   const sceneReady = useExperience((s) => s.sceneReady);
@@ -33,7 +32,7 @@ export default function ViewSwitch() {
   };
 
   const onExport = async () => {
-    // idempotent: returns the cached handle once the scene is booted
+    // 幂等：场景已启动后会返回缓存的句柄
     const dio = bootDiorama();
     if (!dio || exporting) return;
     setExporting(true);
@@ -48,10 +47,16 @@ export default function ViewSwitch() {
   };
 
   useEffect(() => {
-    // ambience auto-starts on the first user gesture (autoplay policy needs one);
-    // the button state follows the engine so an auto-start lights it up too
+    // 环境音会在首次用户手势时自动开始（浏览器自动播放策略要求一次手势）；
+    // 按钮状态跟随引擎，因此自动开启也会点亮图标
     const sync = () => setMusicOn(ambience.isRunning);
-    const onGesture = () => ambience.autoStartOnGesture();
+    // 点击音乐按钮本身不触发自动启动 —— 否则 pointerdown 先把它打开、
+    // 紧接着的 click 又把它关掉（用户按一次反而静音）
+    const onGesture = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.(".music-link")) return;
+      ambience.autoStartOnGesture();
+    };
     sync();
     const off = ambience.onChange(sync);
     window.addEventListener("pointerdown", onGesture);

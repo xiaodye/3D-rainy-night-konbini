@@ -10,34 +10,32 @@ import { bootDiorama } from './diorama'
 import { interpolateActs, OPENING_POSE } from './keyframes'
 
 /**
- * SceneDriver — bridges the diorama bundle (`/diorama.js`, exposed on
- * `window.__DIORAMA`) with our two camera modes.
+ * SceneDriver —— 在场景源码（`src/scene/diorama/`，经 `window.__DIORAMA` 暴露）
+ * 与我们的两种相机模式之间做桥接。
  *
- *  narrative mode
- *    page scroll drives five acts; near the top the camera glides home and
- *    then hands over to the user (idle orbiting), and scrolling re-takes it.
+ *  叙事模式
+ *    页面滚动驱动五幕镜头；接近顶部时相机滑回初始机位，
+ *    随后把控制权交给用户（自由环绕），一旦继续滚动就重新接管。
  *
- *  orbit mode ("360°")
- *    the user owns the camera completely — rotate / zoom / pan. Page scrolling
- *    is locked so the narrative can't fight the camera, the HTML caption layer
- *    fades out, and the mouse wheel is released to the controls for zooming
- *    instead of scrolling.
+ *  360° 模式
+ *    相机完全交给用户 —— 旋转 / 缩放 / 平移。此时锁定页面滚动，
+ *    避免叙事与相机互相打架；HTML 字幕层淡出，
+ *    滚轮也交给 controls 用于缩放而非翻页。
  *
- * Wheel rules matter here: OrbitControls calls preventDefault in its wheel
- * handler, which would swallow page scrolling. In narrative mode we stop the
- * event during the capture phase so the page keeps scrolling normally
- * (⌘/Ctrl+wheel still zooms); in orbit mode the page is locked anyway, so the
- * wheel goes straight to the controls.
+ * 滚轮规则在这里很关键：OrbitControls 会在自己的 wheel 处理器里调用
+ * preventDefault，那会吞掉页面滚动。叙事模式下我们在捕获阶段就停掉该事件，
+ * 让页面正常滚动（⌘/Ctrl+滚轮仍然缩放）；360° 模式下页面本来就锁定了，
+ * 滚轮直接交给 controls。
  */
 
-/** wide limits while the narrative owns the camera */
+/** 叙事模式掌控相机时的宽松限制 */
 const NARRATIVE = { minDistance: 0.6, maxDistance: 160, minPolar: 0.05, maxPolar: Math.PI * 0.98 }
-/** comfortable limits for the idle free-orbit at the top of the page */
+/** 页面顶部空闲自由环绕时的舒适限制 */
 const FREE = { minDistance: 6, maxDistance: 90, minPolar: 0.1, maxPolar: 1.52 }
-/** 360° exploration: as much room as feels good without losing the model */
+/** 360° 探索：在不会迷失模型的前提下尽量给足空间 */
 const EXPLORE = { minDistance: 2.5, maxDistance: 120, minPolar: 0.06, maxPolar: 1.6 }
 
-/** module-level guard so React StrictMode's double mount can't double-init */
+/** 模块级守卫：避免 React StrictMode 的双挂载造成重复初始化 */
 let didInit = false
 let didReportReady = false
 
@@ -73,9 +71,9 @@ export default function SceneDriver() {
     let wheelTarget: HTMLCanvasElement | null = null
 
     /**
-     * narrative mode: keep plain wheel for page scrolling by stopping the event
-     * before OrbitControls can preventDefault it (⌘/Ctrl+wheel still zooms).
-     * orbit mode: the page is locked, so the wheel belongs to the controls.
+     * 叙事模式：在 OrbitControls 来得及 preventDefault 之前停掉事件，
+     * 把普通滚轮留给页面滚动（⌘/Ctrl+滚轮仍然缩放）。
+     * 360° 模式：页面已锁定，滚轮归 controls。
      */
     const onWheelCapture = (e: WheelEvent) => {
       if (e.metaKey || e.ctrlKey) return
@@ -94,30 +92,29 @@ export default function SceneDriver() {
       dio.controls.zoomSpeed = 0.8
       dio.controls.panSpeed = 0.6
       applyProfile(dio, NARRATIVE)
-      // start locked: the narrative glides to act 01, then hands over
+      // 初始为锁定：由叙事滑向第 01 幕，随后交还控制权
       dio.controls.enabled = false
 
-      // a little more room for the "through the glass" act
+      // 为"贴着玻璃看"那一幕多留一点空间
       dio.camera.near = 0.6
       dio.camera.updateProjectionMatrix()
 
       /*
-       * Shadows are baked once instead of every frame. Nothing in the scene
-       * needs a live shadow update (the sliding doors are glass and barely
-       * cast), and re-rendering the 2048² shadow map each frame is a real cost
-       * — the reference build we're replacing did exactly this.
+       * 阴影只烘焙一次，而非每帧重算。场景里没有任何东西需要实时阴影
+       * （自动门是玻璃，几乎不投影），而每帧重渲染一次 2048² 的阴影贴图
+       * 是实打实的开销 —— 我们替换掉的那版实现正是这么做的。
        */
       dio.renderer.shadowMap.autoUpdate = false
       dio.renderer.shadowMap.needsUpdate = true
 
-      // quality preset (resolution + reflection target size)
+      // 画质档位（分辨率 + 反射 target 尺寸）
       applyQualityPreset(dio, useExperience.getState().qualityPreset, isMobile)
       if (isMobile) {
-        // the bundle sets touch-action:none inline; allow vertical page scroll
+        // 上游代码内联了 touch-action:none；这里改回允许纵向页面滚动
         dio.renderer.domElement.style.touchAction = 'pan-y'
       }
 
-      // reduced motion: calmer rain and barely any rain rings
+      // 减弱动效：雨更柔和，雨点涟漪几乎消失
       if (reducedMotion) {
         dio.rain.setAmount(0.35)
         const rip = dio.ground.uniforms.uRipAmp
@@ -128,7 +125,7 @@ export default function SceneDriver() {
       wheelTarget.addEventListener('wheel', onWheelCapture, { capture: true, passive: false })
     }
 
-    /** narrative → 360°: lock the page, fold the captions away, hand over the camera */
+    /** 叙事 → 360°：锁定页面、收起字幕、把相机交给用户 */
     const enterOrbit = (dio: DioramaHandle) => {
       savedScrollY.current = window.scrollY
       document.documentElement.classList.add('is-orbit')
@@ -136,11 +133,11 @@ export default function SceneDriver() {
       dio.controls.enabled = true
       dio.renderer.domElement.style.touchAction = 'none'
       mode.current = 'free'
-      // the viewport just got wider (scrollbar gone) — let the bundle resize
+      // 视口刚变宽（滚动条消失）—— 让场景重新计算尺寸
       window.dispatchEvent(new Event('resize'))
     }
 
-    /** 360° → narrative: restore the page position and let the acts take over */
+    /** 360° → 叙事：恢复页面位置，让五幕重新接管 */
     const exitOrbit = (dio: DioramaHandle) => {
       document.documentElement.classList.remove('is-orbit')
       window.scrollTo(0, savedScrollY.current)
@@ -154,9 +151,9 @@ export default function SceneDriver() {
     const tick = (now: number) => {
       if (disposed) return
 
-      // Boot the scene once (idempotent, synchronous). It looks up
-      // <canvas id="scene"> by id, so the element must already be in the DOM —
-      // which it is, since this runs from a React effect after mount.
+      // 启动场景一次（幂等、同步）。它按 id 查找 <canvas id="scene">，
+      // 因此该元素必须已在 DOM 中 —— 由于这里是挂载后的 React effect 里执行，
+      // 条件自然满足。
       let dio = getDiorama()
       if (!dio) {
         if (!document.getElementById('scene')) {
@@ -179,7 +176,7 @@ export default function SceneDriver() {
         markBoot('init')
       }
 
-      // honest readiness: we have actually rendered a frame
+      // 真实的就绪判定：我们确实渲染出了一帧
       const renderedFrame = dio.renderer.info.render.calls > 0
       if (!didReportReady && renderedFrame) {
         didReportReady = true
@@ -189,27 +186,27 @@ export default function SceneDriver() {
 
       const state = useExperience.getState()
 
-      // ---- quality preset changes (driven by the water panel) ----
+      // ---- 画质档位变化（由水面面板驱动） ----
       if (state.qualityPreset !== lastQuality.current) {
         lastQuality.current = state.qualityPreset
         applyQualityPreset(dio, state.qualityPreset, isMobile)
       }
 
-      // ---- view mode transitions ----
+      // ---- 视角模式切换 ----
       if (state.viewMode !== lastViewMode.current) {
         if (state.viewMode === 'orbit') enterOrbit(dio)
         else exitOrbit(dio)
         lastViewMode.current = state.viewMode
       }
 
-      // ---- 360°: the user owns the camera, never touch it ----
+      // ---- 360°：相机归用户，绝不去碰 ----
       if (state.viewMode === 'orbit') {
         lastTime.current = now
         raf = requestAnimationFrame(tick)
         return
       }
 
-      // ---- narrative camera ----
+      // ---- 叙事相机 ----
       const dt = lastTime.current ? Math.min((now - lastTime.current) / 1000, 0.1) : 1 / 60
       lastTime.current = now
       const damping = 1 - Math.exp(-3.0 * dt)
@@ -219,7 +216,7 @@ export default function SceneDriver() {
       const controls = dio.controls
 
       if (progress < 0.02) {
-        // idle at the top: glide home, then give the camera to the user
+        // 顶部空闲：滑回初始机位，然后把相机交给用户
         if (mode.current === 'scroll') {
           cam.position.lerp(OPENING_POSE.pos, damping * 0.6)
           controls.target.lerp(OPENING_POSE.target, damping)
@@ -232,7 +229,7 @@ export default function SceneDriver() {
             controls.enabled = true
           }
         }
-        // in 'free' mode we leave the camera completely alone
+        // 'free' 模式下完全不干预相机
       } else {
         if (mode.current === 'free') {
           mode.current = 'scroll'
@@ -260,5 +257,5 @@ export default function SceneDriver() {
   return null
 }
 
-/** small helper kept for parity with the previous driver */
+/** 保留的小工具，与之前的 driver 保持接口一致 */
 export const __isSkipIntro = () => hasQueryFlag('skipintro')

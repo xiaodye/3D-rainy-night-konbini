@@ -1,13 +1,12 @@
 /*
- * Restored from the bundled diorama (see reference/README.md).
+ * 还原自打包产物 diorama（见 docs/source-restore.md）。
  *
- * Mechanically converted back to source: the original module had the same
- * structure, this file just swaps the `window.__M` namespace wiring for ES
- * module imports/exports. The rendering logic itself is unchanged.
+ * 机械转换回源码：原模块结构相同，本文件只是把 `window.__M` 命名空间
+ * 接线换成 ES module 的 import/export，渲染逻辑本身未改动。
  *
- * TYPED ✓ — see docs/source-restore.md. The types here are the contract the
- * whole scene is built on: `SurfaceOpts` / `GlowOpts` / `AdditiveOpts` for the
- * material factories, `PieceOpts` for placement, and the `Builder` API below.
+ * TYPED ✓ — 见 docs/source-restore.md。这里的类型是整个场景赖以构建的契约：
+ * 材质工厂的 `SurfaceOpts` / `GlowOpts` / `AdditiveOpts`、摆放用的 `PieceOpts`，
+ * 以及下方的 `Builder` API。
  */
 
 import * as THREE from 'three'
@@ -16,18 +15,18 @@ import { OUTLINE } from './config'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 // ---------------------------------------------------------------------------
-// Toon material system + geometry builder with automatic merging and
-// inverted-hull outlines (one draw call per material bucket).
+// Toon 材质系统 + 几何 builder：自动合并与倒壳描边
+// （每个材质桶只需一次 draw call）。
 // ---------------------------------------------------------------------------
 
-// --- gradient ramp -----------------------------------------------------------
+// --- 阶梯渐变贴图 ---------------------------------------------------------------
 const _ramps = new Map();
 function gradientMap(steps = 4): THREE.DataTexture {
   if (_ramps.has(steps)) return _ramps.get(steps);
   const data = new Uint8Array(steps * 4);
   for (let i = 0; i < steps; i++) {
     const t = i / (steps - 1);
-    // ease the toe so shadows stay readable, keep a bright shoulder
+    // 压低暗部让阴影仍有层次，同时保留一段明亮的肩部
     const v = Math.round(255 * Math.pow(t, 0.82) * (0.82 + 0.18 * t) + 26);
     const o = i * 4;
     data[o] = data[o + 1] = data[o + 2] = Math.min(255, v);
@@ -41,7 +40,7 @@ function gradientMap(steps = 4): THREE.DataTexture {
   return tex;
 }
 
-// --- material cache ----------------------------------------------------------
+// --- 材质缓存 ------------------------------------------------------------------
 const _matCache = new Map<string, THREE.Material>();
 function cache<T extends THREE.Material>(key: string, make: () => T): T {
   let m = _matCache.get(key) as T | undefined;
@@ -49,12 +48,12 @@ function cache<T extends THREE.Material>(key: string, make: () => T): T {
   return m;
 }
 
-/** a position / rotation / scale triple (degrees for rotations) */
+/** 位置 / 旋转 / 缩放三元组（旋转单位为度） */
 export type Vec3 = [number, number, number]
 
-/** cel-shaded surface options */
+/** 卡通着色表面的选项 */
 export interface SurfaceOpts {
-  /** self-illumination colour; also what makes a surface bloom */
+  /** 自发光颜色；也是让表面产生 bloom 的原因 */
   emissive?: number
   emissiveIntensity?: number
   flat?: boolean
@@ -63,13 +62,13 @@ export interface SurfaceOpts {
   transparent?: boolean
   map?: THREE.Texture | null
   depthWrite?: boolean
-  /** number of toon light bands (1–4) */
+  /** toon 光照的阶梯数量（1–4） */
   ramp?: number
   vertexColors?: boolean
   fog?: boolean
 }
 
-/** unlit / self-illuminated surface options */
+/** 无光照 / 自发光表面的选项 */
 export interface GlowOpts {
   side?: THREE.Side
   opacity?: number
@@ -79,34 +78,34 @@ export interface GlowOpts {
   depthWrite?: boolean
 }
 
-/** additive glow card options */
+/** 叠加发光卡片的选项 */
 export interface AdditiveOpts {
   map?: THREE.Texture | null
   opacity?: number
   depthWrite?: boolean
 }
 
-/** where to drop a piece inside the Builder */
+/** 往 Builder 里投放一个部件时的参数 */
 export interface PieceOpts {
   pos?: Vec3
   rot?: Vec3
   scale?: Vec3
-  /** outline width multiplier (0 = no outline) */
+  /** 描边宽度倍数（0 = 无描边） */
   outline?: number
-  /** skip merging and keep a live mesh — required for anything animated */
+  /** 跳过合并、保留为活动 mesh —— 任何需要动画的部件都必须这样 */
   dynamic?: boolean
   parent?: THREE.Object3D | null
   name?: string
 }
 
-/** what `Builder.finalize()` reports (also published as `data-stats`) */
+/** `Builder.finalize()` 的返回值（同时发布为 `data-stats`） */
 export interface BuildStats {
   buckets: number
   meshes: number
   tris: number
 }
 
-/** Cel-shaded surface. */
+/** 卡通着色表面。 */
 function toon(color: number, opts: SurfaceOpts = {}): THREE.MeshToonMaterial {
   const {
     emissive = 0x000000, emissiveIntensity = 1, flat = false, side = THREE.FrontSide,
@@ -126,7 +125,7 @@ function toon(color: number, opts: SurfaceOpts = {}): THREE.MeshToonMaterial {
   });
 }
 
-/** Unlit / self-illuminated surface. intensity > 1 goes HDR for the bloom pass. */
+/** 无光照 / 自发光表面。intensity > 1 会进入 HDR，交给 bloom pass 处理。 */
 function glow(color: number, intensity = 1, opts: GlowOpts = {}): THREE.MeshBasicMaterial {
   const { side = THREE.FrontSide, opacity = 1, transparent = false, map = null, fog = false, depthWrite = true } = opts;
   const key = `G|${color}|${intensity}|${side}|${opacity}|${transparent}|${map ? map.uuid : 0}|${fog}|${depthWrite}`;
@@ -138,7 +137,7 @@ function glow(color: number, intensity = 1, opts: GlowOpts = {}): THREE.MeshBasi
   });
 }
 
-/** Additive glow card (light halos, light shafts, wet streaks). */
+/** 叠加发光卡片（灯光光晕、光束、湿地反光条）。 */
 function additive(color: number, intensity = 1, opts: AdditiveOpts = {}): THREE.MeshBasicMaterial {
   const { map = null, opacity = 1, depthWrite = false } = opts;
   const key = `A|${color}|${intensity}|${map ? map.uuid : 0}|${opacity}|${depthWrite}`;
@@ -152,7 +151,7 @@ function additive(color: number, intensity = 1, opts: AdditiveOpts = {}): THREE.
   });
 }
 
-// --- radial glow sprite ------------------------------------------------------
+// --- 径向光晕 sprite ------------------------------------------------------------
 let _glowTex: THREE.CanvasTexture | null = null;
 function glowTexture(): THREE.CanvasTexture {
   if (_glowTex) return _glowTex;
@@ -172,7 +171,7 @@ function glowTexture(): THREE.CanvasTexture {
   return _glowTex;
 }
 
-// --- outline shell -----------------------------------------------------------
+// --- 描边壳 ---------------------------------------------------------------------
 const OUTLINE_MAT = new THREE.ShaderMaterial({
   uniforms: { uColor: { value: new THREE.Color(OUTLINE.color) }, uPx: { value: OUTLINE.px } },
   vertexShader: /* glsl */`
@@ -198,7 +197,7 @@ const OUTLINE_MAT = new THREE.ShaderMaterial({
   fog: false,
 });
 
-// --- geometry normalisation --------------------------------------------------
+// --- 几何规格化 -----------------------------------------------------------------
 function prep(geo: THREE.BufferGeometry, outline: number): THREE.BufferGeometry {
   let g = geo.index ? geo.toNonIndexed() : geo;
   if (g === geo) g = geo.clone();
@@ -227,20 +226,20 @@ function xform(pos?: Vec3, rot?: Vec3, scale?: Vec3): THREE.Matrix4 {
 }
 
 // ---------------------------------------------------------------------------
-// Builder: author freely, merge at the end.
+// Builder：自由摆放，最后统一合并。
 // ---------------------------------------------------------------------------
 class Builder {
   root: THREE.Group
-  /** material -> geometries waiting to be merged (one draw call per bucket) */
+  /** 材质 -> 待合并的几何（每个桶一次 draw call） */
   buckets: Map<THREE.Material, THREE.BufferGeometry[]>
-  /** pieces added (reported as `meshes` in the stats) */
+  /** 已添加的部件数（统计里报为 `meshes`） */
   count: number
   tris: number
   _geoCache: Map<string, THREE.BufferGeometry>
 
   constructor() {
     this.root = new THREE.Group();
-    this.buckets = new Map(); // material -> [geometry]
+    this.buckets = new Map(); // 材质 -> [几何]
     this.count = 0;
     this.tris = 0;
     this._geoCache = new Map();
@@ -272,8 +271,8 @@ class Builder {
   }
 
   /**
-   * Add geometry. opts: { pos, rot, scale, outline, dynamic, parent, name }
-   * outline: multiplier for the hull width (0 = no outline).
+   * 添加几何。opts：{ pos, rot, scale, outline, dynamic, parent, name }
+   * outline：描边壳宽度的倍数（0 = 无描边）。
    */
   add(geo: THREE.BufferGeometry, mat: THREE.Material, opts: PieceOpts = {}): THREE.Mesh | null {
     const { pos, rot, scale, outline = 1, dynamic = false, parent = null, name = '' } = opts;
@@ -300,9 +299,9 @@ class Builder {
 
   box(w: number, h: number, d: number, mat: THREE.Material, opts?: PieceOpts) { return this.add(this.boxGeo(w, h, d), mat, opts); }
   cyl(rt: number, rb: number, h: number, seg: number, mat: THREE.Material, opts?: PieceOpts) { return this.add(this.cylGeo(rt, rb, h, seg), mat, opts); }
-  /** Vertical plane, normal facing +z by default. */
+  /** 竖直平面，默认法线朝 +z。 */
   plane(w: number, h: number, mat: THREE.Material, opts?: PieceOpts) { return this.add(this.planeGeo(w, h), mat, opts); }
-  /** Horizontal plane (facing up). */
+  /** 水平平面（朝上）。 */
   plate(w: number, d: number, mat: THREE.Material, opts: PieceOpts = {}) {
     const rot: Vec3 = opts.rot ? [...opts.rot] : [0, 0, 0];
     const o: PieceOpts = { ...opts, rot: [rot[0] - Math.PI / 2, rot[1], rot[2]] };
@@ -310,7 +309,7 @@ class Builder {
   }
   sphere(r: number, seg: number, mat: THREE.Material, opts?: PieceOpts) { return this.add(this.sphereGeo(r, seg), mat, opts); }
 
-  /** Merge every static bucket into one mesh per material, then build outline shells. */
+  /** 把每个静态桶合并为「一个材质一个 mesh」，再生成描边壳。 */
   finalize({ outlineMeshes = true }: { outlineMeshes?: boolean } = {}): BuildStats {
     let buckets = 0;
     for (const [mat, geos] of this.buckets) {
@@ -336,7 +335,7 @@ class Builder {
   }
 }
 
-/** Convenience: build a small static group and return it merged. */
+/** 便捷方法：构建一个小型静态 group 并以合并形式返回。 */
 function mergeGroup(group: THREE.Group): THREE.Group {
   const out = new THREE.Group();
   return out;

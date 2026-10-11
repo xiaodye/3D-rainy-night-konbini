@@ -18,9 +18,9 @@ body {
   overscroll-behavior: none;
 }
 
-/* #root spans the whole 500vh narrative flow, so it must NOT swallow pointer
-   input — otherwise the WebGL canvas underneath never receives a single event
-   and orbiting/zooming is completely dead. Interactive children opt back in. */
+/* #root 覆盖整段 500vh 的叙事流，因此绝不能吞掉指针事件 ——
+   否则下方的 WebGL canvas 收不到任何事件，旋转 / 缩放就彻底失效。
+   需要交互的子元素再各自把事件打开。 */
 #root {
   position: relative;
   pointer-events: none;
@@ -30,8 +30,8 @@ body {
   background: rgba(120, 160, 220, 0.25);
 }
 
-/* ---------- WebGL diorama canvas (scene built by src/scene/diorama) ---------- */
-/* id must stay `scene` — the bundle looks it up by that name */
+/* ---------- WebGL diorama 画布（场景由 src/scene/diorama 构建） ---------- */
+/* id 必须保持为 `scene` —— 场景源码按这个名字查找它 */
 #scene {
   position: fixed;
   inset: 0;
@@ -48,14 +48,14 @@ body {
   cursor: grabbing;
 }
 
-/* the bundle's own panel DOM is used as a hidden parameter source only */
+/* 历史遗留：上游面板 DOM 已从 index.html 移除，这条规则目前没有匹配元素 */
 #demo-ui {
   display: none;
 }
 
-/* cinematic vignette above the canvas, below the narrative.
-   Kept light: the bundle's own composite pass already adds vignette + grain,
-   so this is only a whisper of extra falloff. */
+/* 电影感暗角：在画布之上、叙事层之下。
+   刻意做得很轻：场景自身的合成 pass 已经有暗角与颗粒，
+   这里只是再补一丝微弱的压暗。 */
 #vig {
   position: fixed;
   inset: 0;
@@ -69,7 +69,7 @@ body {
   );
 }
 
-/* ---------- Loading screen ---------- */
+/* ---------- 加载页 ---------- */
 .loading-screen {
   position: fixed;
   inset: 0;
@@ -120,7 +120,7 @@ body {
   transition: width 0.25s ease;
 }
 
-/* ---------- Scroll narrative ---------- */
+/* ---------- 滚动叙事 ---------- */
 .narrative {
   position: relative;
   z-index: 2;
@@ -128,7 +128,7 @@ body {
   transition: opacity 0.6s ease;
 }
 
-/* ---------- 360° mode: page locked, captions folded away ---------- */
+/* ---------- 360° 模式：页面锁定，字幕收起 ---------- */
 html.is-orbit {
   overflow: hidden;
 }
@@ -189,7 +189,7 @@ html.is-orbit .scroll-hint {
   font-weight: 400;
 }
 
-/* corner annotations */
+/* 边角标注 */
 .nb-corner {
   position: absolute;
   font-size: 10px;
@@ -198,7 +198,7 @@ html.is-orbit .scroll-hint {
   line-height: 2.1;
 }
 
-/* Explore again */
+/* 再看一次 */
 .explore-again {
   pointer-events: auto;
   margin-top: 34px;
@@ -221,7 +221,7 @@ html.is-orbit .scroll-hint {
   color: rgba(255, 255, 255, 0.9);
 }
 
-/* scroll hint */
+/* 滚动提示 */
 .scroll-hint {
   position: fixed;
   bottom: 26px;
@@ -269,12 +269,12 @@ html.is-orbit .scroll-hint {
   }
 }
 
-/* ---------- Water tuning panel ---------- */
-/* deliberately quiet: film-caption typography, hairline rules, no glass glow */
+/* ---------- 水面调参面板 ---------- */
+/* 刻意保持安静：电影字幕式排版、发丝级分隔线、不用玻璃光效 */
 .water-ui {
   position: fixed;
   right: 18px;
-  top: 60px; /* stacked under the view-mode switch */
+  top: 60px; /* 叠放在视角模式切换下方 */
   z-index: 20;
   pointer-events: auto;
   font-size: 11px;
@@ -388,7 +388,7 @@ html.is-orbit .scroll-hint {
   text-align: right;
 }
 
-/* hairline sliders (no glow, unlike the upstream demo) */
+/* 发丝级滑块（不像上游 demo 那样带发光） */
 .water-row input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -454,7 +454,7 @@ html.is-orbit .scroll-hint {
   color: rgba(255, 255, 255, 0.22);
 }
 
-/* mobile: dock to the bottom as a drawer */
+/* 移动端：改为贴底的抽屉 */
 @media (max-width: 720px), (pointer: coarse) {
   .water-ui {
     left: 0;
@@ -487,7 +487,7 @@ html.is-orbit .scroll-hint {
   }
 }
 
-/* ---------- View mode switch (top-right) ---------- */
+/* ---------- 视角模式切换（右上角） ---------- */
 .view-switch {
   position: fixed;
   right: 18px;
@@ -555,7 +555,7 @@ html.is-orbit .scroll-hint {
     right: 14px;
   }
 
-  /* touch copy: no wheel or right-drag on a phone */
+  /* 触屏文案：手机上没有滚轮与右键拖拽 */
   .view-hint {
     max-width: 40vw;
     white-space: normal;
@@ -563,7 +563,7 @@ html.is-orbit .scroll-hint {
   }
 }
 
-/* quality preset row inside the water panel */
+/* 水面面板内的画质档位行 */
 .water-quality {
   display: flex;
   align-items: center;
@@ -610,7 +610,7 @@ html.is-orbit .scroll-hint {
   color: rgba(255, 255, 255, 0.2);
 }
 
-/* visually-hidden heading: present for crawlers & assistive tech only */
+/* 视觉隐藏的标题：只对爬虫与辅助技术可见 */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -623,7 +623,7 @@ html.is-orbit .scroll-hint {
   border: 0;
 }
 
-/* shown when JavaScript is disabled (also what crawlers end up reading) */
+/* 禁用 JavaScript 时显示（也是爬虫最终读到的内容） */
 .noscript-note {
   max-width: 560px;
   margin: 18vh auto 0;
@@ -646,29 +646,6 @@ html.is-orbit .scroll-hint {
   color: rgba(255, 255, 255, 0.45);
 }
 
-/* visually-hidden heading: present for crawlers & assistive tech only */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* shown when JavaScript is disabled (also what crawlers end up reading) */
-.noscript-note {
-  max-width: 560px;
-  margin: 18vh auto 0;
-  padding: 0 24px;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 14px;
-  line-height: 1.9;
-}
-
 .noscript-note h2 {
   font-size: 20px;
   font-weight: 500;
@@ -682,7 +659,7 @@ html.is-orbit .scroll-hint {
   color: rgba(255, 255, 255, 0.45);
 }
 
-/* GitHub repo link, sitting at the far right of the view-mode switch */
+/* GitHub 仓库链接，位于视角切换的最右侧 */
 .gh-link {
   display: flex;
   align-items: center;
@@ -703,16 +680,6 @@ html.is-orbit .scroll-hint {
   transform: translateY(-1px);
 }
 
-/* GitHub repo link, sitting at the far right of the view-mode switch */
-.gh-link {
-  display: flex;
-  align-items: center;
-  color: rgba(255, 255, 255, 0.3);
-  transition:
-    color 0.45s ease,
-    transform 0.45s ease;
-}
-
 .gh-link svg {
   width: 17px;
   height: 17px;
@@ -724,7 +691,7 @@ html.is-orbit .scroll-hint {
   transform: translateY(-1px);
 }
 
-/* GLB export button, next to the GitHub link in the view-mode row */
+/* GLB 导出按钮，紧邻视角切换行里的 GitHub 链接 */
 .export-link {
   display: flex;
   align-items: center;
@@ -747,7 +714,7 @@ html.is-orbit .scroll-hint {
   color: rgba(255, 255, 255, 0.78);
 }
 
-/* while the exporter works the icon spins and the button ignores clicks */
+/* 导出进行中：图标旋转，按钮忽略点击 */
 .export-link.exporting svg {
   animation: export-spin 1s linear infinite;
 }
@@ -762,7 +729,7 @@ html.is-orbit .scroll-hint {
   }
 }
 
-/* ambience toggle — glows warm while the night sounds are playing */
+/* 环境音开关 —— 夜里的声音响起时泛暖色 */
 .music-link {
   display: flex;
   align-items: center;
@@ -787,19 +754,6 @@ html.is-orbit .scroll-hint {
 
 .music-link.is-on {
   color: rgba(255, 207, 133, 0.85);
-}
-
-/* ambience toggle — glows warm while the night sounds are playing */
-.music-link {
-  display: flex;
-  align-items: center;
-  color: rgba(255, 255, 255, 0.3);
-  transition: color 0.45s ease;
-  cursor: pointer;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
 }
 
 .music-link svg {

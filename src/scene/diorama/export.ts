@@ -1,18 +1,18 @@
 /**
- * GLB export for the diorama scene.
+ * 场景的 GLB 导出。
  *
- * Export strategy (deliberately NOT `scene.clone(true)`):
- * `Object3D.clone()` reconstructs custom subclasses via `new this.constructor().copy(this)`,
- * which crashes on `WetGround` (its constructor requires the renderer). Instead we
+ * 导出策略（刻意**不用** `scene.clone(true)`）：
+ * `Object3D.clone()` 会通过 `new this.constructor().copy(this)` 重建自定义子类，
+ * 而 `WetGround` 的构造函数需要 renderer，会直接崩。所以改为：
  *
- *   1. temporarily swap materials for glTF-friendly equivalents — the live scene uses
- *      MeshToonMaterial and custom ShaderMaterials, none of which glTF can store;
- *      conversion keeps colour / maps / emissive so the model still reads in Blender
- *   2. assemble a temporary export tree from the live children (lights, merged geometry,
- *      store / props groups) — reparenting is undone in `finally`
- *   3. swap the wet ground for a plain textured plane (its ShaderMaterial is not
- *      representable; the painted albedo map is)
- *   4. skip GPU point systems (rain / splashes) — they are shader-driven, not meshes
+ *   1. 临时把材质换成 glTF 能表达的等价物 —— 活动场景用的是 MeshToonMaterial 与自定义
+ *      ShaderMaterial，两者 glTF 都存不下；转换会保留颜色 / 贴图 / 自发光，
+ *      这样导进 Blender 仍有正常外观
+ *   2. 用活动的 children（灯光、已合并的几何、store / props 分组）临时拼一棵导出树
+ *      —— reparent 在 `finally` 里还原
+ *   3. 湿地面换成一个带贴图的普通平面（它的 ShaderMaterial 无法表达，
+ *      但手绘的 albedo 贴图可以）
+ *   4. 跳过 GPU 点系统（雨 / 溅落）—— 它们由 shader 驱动，不是 mesh
  */
 
 import * as THREE from 'three'
@@ -21,7 +21,7 @@ import type { DioramaScene } from './index'
 
 type AnyMat = THREE.Material & Record<string, any>
 
-/** nearest glTF-friendly material for everything the scene uses */
+/** 为场景用到的每种材质给出最接近的 glTF 友好材质 */
 function convertMaterial(m: AnyMat): THREE.Material {
   if (isGlTFCompatible(m)) return m
 
@@ -37,7 +37,7 @@ function convertMaterial(m: AnyMat): THREE.Material {
     })
   }
 
-  // MeshToonMaterial → PBR, keeping the authored colour / texture / emissive
+  // MeshToonMaterial → PBR，保留原有的颜色 / 贴图 / 自发光
   return new THREE.MeshStandardMaterial({
     color: m.color ? m.color.clone() : new THREE.Color(0xffffff),
     map: m.map ?? null,
@@ -50,8 +50,8 @@ function convertMaterial(m: AnyMat): THREE.Material {
   })
 }
 
-/* three r160+ exposes isMeshStandardMaterial / isMeshBasicMaterial / isMeshPhysicalMaterial
-   on the prototypes — exactly the set glTF can store without conversion */
+/* three r160+ 在原型上暴露了 isMeshStandardMaterial / isMeshBasicMaterial /
+   isMeshPhysicalMaterial —— 正好是 glTF 无需转换即可存储的那一类 */
 function isGlTFCompatible(m: THREE.Material): boolean {
   return (
     (m as any).isMeshStandardMaterial === true ||
@@ -65,8 +65,8 @@ function isPoints(o: THREE.Object3D): boolean {
 }
 
 /**
- * Serialise the scene to a binary glTF and trigger a browser download.
- * The live scene is fully restored afterwards (materials + subtree parenting).
+ * 把场景序列化为二进制 glTF，并触发浏览器下载。
+ * 完成后活动场景会被完整还原（材质 + 子树父子关系）。
  */
 export async function exportGLB(
   dio: DioramaScene,
@@ -80,7 +80,7 @@ export async function exportGLB(
   const exportScene = new THREE.Scene()
 
   try {
-    // 1) materials → glTF-friendly equivalents (restored in finally)
+    // 1) 材质 → glTF 友好等价物（在 finally 中还原）
     scene.traverse((o) => {
       const mesh = o as THREE.Mesh
       if (!mesh.isMesh || !mesh.material) return
@@ -93,13 +93,13 @@ export async function exportGLB(
       mesh.material = (Array.isArray(original) ? converted : converted[0]) as THREE.Material
     })
 
-    // 2) assemble the export tree
+    // 2) 拼装导出树
     for (const child of [...scene.children]) {
-      if (isPoints(child)) continue // rain / splashes: GPU point systems
+      if (isPoints(child)) continue // 雨 / 溅落：GPU 点系统
 
       if (child instanceof WetGround) {
-        // the live wet ground is a ShaderMaterial mesh — swap for a plain
-        // textured plane carrying the same painted albedo canvas
+        // 活动的湿地面是一个 ShaderMaterial mesh —— 换成一块带贴图的普通平面，
+        // 沿用同一张手绘 albedo 画布
         const plane = new THREE.Mesh(
           new THREE.PlaneGeometry(26, 26).rotateX(-Math.PI / 2),
           new THREE.MeshStandardMaterial({
@@ -114,7 +114,7 @@ export async function exportGLB(
         continue
       }
 
-      // lights, merged geometry, store / props groups — exported as-is
+      // 灯光、已合并几何、store / props 分组 —— 原样导出
       const parent = child.parent as THREE.Object3D
       exportScene.add(child)
       subtreeRestores.push(() => {
@@ -122,7 +122,7 @@ export async function exportGLB(
       })
     }
 
-    // 3) export
+    // 3) 导出
     const exporter = new GLTFExporter()
     const result = await exporter.parseAsync(exportScene, { binary: true })
 
@@ -138,7 +138,7 @@ export async function exportGLB(
 
     return { bytes: blob.size }
   } finally {
-    // undo everything: children back to the live scene, original materials back
+    // 全部还原：children 回到活动场景，材质恢复原样
     for (const restore of subtreeRestores) restore()
     for (const swap of materialSwaps) swap()
   }

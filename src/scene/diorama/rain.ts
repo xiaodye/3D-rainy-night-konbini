@@ -1,11 +1,10 @@
 /*
- * Restored from the bundled diorama (see reference/README.md).
+ * 还原自打包产物 diorama（见 docs/source-restore.md）。
  *
- * Mechanically converted back to source: the original module had the same
- * structure, this file just swaps the `window.__M` namespace wiring for ES
- * module imports/exports. The rendering logic itself is unchanged.
+ * 机械转换回源码：原模块结构相同，本文件只是把 `window.__M` 命名空间
+ * 接线换成 ES module 的 import/export，渲染逻辑本身未改动。
  *
- * TYPED ✓ — see docs/source-restore.md.
+ * TYPED ✓ — 见 docs/source-restore.md。
  */
 
 import * as THREE from 'three'
@@ -14,11 +13,11 @@ import { makeRng } from './config'
 import type { WetGround } from './ground'
 
 // ---------------------------------------------------------------------------
-// Rain: falling streaks, ground splashes and drips off the awnings / eaves.
-// Everything is instanced and animated on the GPU.
+// 雨：下落的雨丝、地面溅落，以及从雨棚 / 屋檐滴落的水。
+// 全部使用 instancing，动画在 GPU 上完成。
 // ---------------------------------------------------------------------------
 
-const BOX = 30;      // rain volume tile size — centred on the diorama, not the camera
+const BOX = 30;      // 雨体积的平铺尺寸 —— 以 diorama 为中心，而非相机
 const HEIGHT = 26;
 
 function streakTexture(): THREE.CanvasTexture {
@@ -56,7 +55,7 @@ function ringTexture(): THREE.CanvasTexture {
 
 const RAIN_VS = /* glsl */`
   attribute vec3 aOffset;
-  attribute vec2 aParams;   // fall speed, random phase
+  attribute vec2 aParams;   // 下落速度、随机相位
   attribute float aLen;
   uniform float uTime;
   uniform vec3 uCam;
@@ -79,7 +78,7 @@ const RAIN_VS = /* glsl */`
     vec3 wp = p + right * position.x * w + up * position.y * aLen;
 
     float d = length(uCam - wp);
-    // keep the shower inside the model footprint
+    // 让雨只落在模型范围内
     float outside = 1.0 - smoothstep(12.5, 15.5, length(p.xz));
     vFade = exp(-d * 0.014) * (0.55 + 0.45 * aParams.y) * outside;
     vUvS = uv;
@@ -104,7 +103,7 @@ const RAIN_FS = /* glsl */`
 
 const SPLASH_VS = /* glsl */`
   attribute vec3 aOffset;
-  attribute vec2 aParams;   // phase, size
+  attribute vec2 aParams;   // 相位、尺寸
   uniform float uTime;
   uniform vec3 uCam;
   uniform float uBox;
@@ -141,10 +140,10 @@ const SPLASH_FS = /* glsl */`
   }
 `;
 
-// drips falling from a list of world-space origins
+// 从一组世界坐标起点滴落的水
 const DRIP_VS = /* glsl */`
   attribute vec3 aOrigin;
-  attribute vec2 aParams;   // phase, speed
+  attribute vec2 aParams;   // 相位、速度
   attribute float aLen;
   uniform float uTime;
   varying float vFade;
@@ -178,10 +177,10 @@ const DRIP_FS = /* glsl */`
   }
 `;
 
-/** live rain system: set its density, tick it every frame */
+/** 活动的雨系统：设置密度、每帧 tick */
 export interface RainHandle {
   group: THREE.Group
-  /** 0 = no rain, 1 = default, >1 = heavier */
+  /** 0 = 无雨，1 = 默认，>1 = 更大 */
   setAmount(v: number): void
   update(t: number, dt: number, camera: THREE.Camera): void
 }
@@ -197,7 +196,7 @@ function buildRain(
   const streakTex = streakTexture();
   const ringTex = ringTexture();
 
-  // --- falling rain ---------------------------------------------------------
+  // --- 下落的雨丝 -------------------------------------------------------------
   const N = 3200;
   const plane = new THREE.PlaneGeometry(1, 1);
   const rainGeo = new THREE.InstancedBufferGeometry();
@@ -233,7 +232,7 @@ function buildRain(
   rain.renderOrder = 6;
   group.add(rain);
 
-  // --- splashes -------------------------------------------------------------
+  // --- 溅落 -------------------------------------------------------------------
   const M = 260;
   const splashGeo = new THREE.InstancedBufferGeometry();
   splashGeo.index = plane.index;
@@ -264,18 +263,18 @@ function buildRain(
   splash.renderOrder = 5;
   if (wantSplash) group.add(splash);
 
-  // --- drips off the eaves --------------------------------------------------
+  // --- 檐下滴水 ---------------------------------------------------------------
   const drips = [
-    // storefront awning edge
+    // 店前雨棚边缘
     [-0.4, 3.16, 0.42], [1.6, 3.16, 0.42], [3.6, 3.16, 0.42], [5.6, 3.16, 0.42], [7.6, 3.16, 0.42],
-    // store roof line
+    // 便利店屋顶轮廓
     [-0.9, 4.32, 0.55], [2.4, 4.32, 0.55], [5.6, 4.32, 0.55], [8.2, 4.32, 0.55],
-    // west eave
+    // 西侧屋檐
     [-1.02, 4.32, -3.2], [-1.02, 4.32, -6.4], [-1.02, 4.32, -8.6],
-    // neighbour building eaves
+    // 邻居楼的屋檐
     [10.05, 6.6, -2.2], [10.05, 6.6, -5.6], [10.05, 6.6, -9.4],
     [-9.62, 5.6, -1.0], [-9.62, 5.6, -4.6], [-9.62, 5.6, -8.0],
-    // traffic-light gantry
+    // 信号灯横杆
     [-7.6, 4.9, 5.3],
   ];
   const D = drips.length;
@@ -310,7 +309,7 @@ function buildRain(
   const cam = new THREE.Vector3();
   return {
     group,
-    /** 0 = 无雨, 1 = 默认, >1 = 更大 */
+    /** 0 = 无雨，1 = 默认，>1 = 更大 */
     setAmount(v: number): void {
       const k = Math.max(0, v);
       rainMat.uniforms.uOpacity.value = 0.78 * k;
